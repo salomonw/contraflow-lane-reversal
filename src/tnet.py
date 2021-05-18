@@ -56,10 +56,10 @@ class tNet():
         self.node_id_map = node_id_map
         self.fcoeffs = fcoeffs
         self.nPoly = len(fcoeffs)
-        self.TAP = self.build_TAP(self.G)
+        #self.TAP = self.build_TAP(self.G)
         self.incidence_matrix, self.link_id_dict = incidence_matrix(self.G)
 
-    def build_TAP(self, G):
+    def build_TAP(self, G , n_iter=5000):
         """
 	    Build a traffic assignment object based on the traffic network 
 	    Jurgen Hackl <hackl@ibi.baug.ethz.ch>
@@ -78,7 +78,7 @@ class tNet():
         assert (self.totalDemand > 0), "Total demand is zero!!"
         assert (self.nNodes > 0), "No nodes in graph!!"
         assert (self.nLinks > 0), "No links in graph!!"
-        TAP = msa.TrafficAssignment(G, self.gGraph, fcoeffs=self.fcoeffs, iterations=500)
+        TAP = msa.TrafficAssignment(G, self.gGraph, fcoeffs=self.fcoeffs, iterations=n_iter)
         return TAP
 
     def build_pedestrian_net(self):
@@ -238,9 +238,9 @@ class tNet():
         self.G = self.TAP.graph
         return runtime, self.TAP.RG
 
-    def solveMSA_supergraph(self, build_t0=False, exogenous_G=False):
+    def solveMSAsocial_supergraph(self, build_t0=False, exogenous_G=False):
         """
-        Solve the MSA flows for a traffic network using the MSA module by
+        Solve the MSA social flows for a traffic network using the MSA module by
         Jurgen Hackl <hackl@ibi.baug.ethz.ch>
 
         Parameters
@@ -253,37 +253,37 @@ class tNet():
         An nx object.
 
         """
+
         self.build_TAP(self.G_supergraph)
         t0 = time.process_time()
-        self.TAP.run(fcoeffs=self.fcoeffs, build_t0=build_t0, exogenous_G=exogenous_G)
+        TT = self.TAP.run_social(fcoeffs=self.fcoeffs, build_t0=build_t0, exogenous_G=exogenous_G)
         runtime = time.process_time() - t0
         self.G_supergraph = self.TAP.graph
-        return runtime, self.TAP.RG
 
+        return TT, runtime
 
-    def solveMSAsocial_supergraph(self, build_t0=False, exogenous_G=False):
+    def solveMSAsocial_capacity_supergraph(self, build_t0=False, exogenous_G=False, d_step=1, n_iter=200):
         """
-	    Solve the MSA social flows for a traffic network using the MSA module by
-	    Jurgen Hackl <hackl@ibi.baug.ethz.ch>
+        Solve the MSA social flows for a traffic network using the MSA module by
+        Jurgen Hackl <hackl@ibi.baug.ethz.ch>
 
-	    Parameters
-	    ----------
+        Parameters
+        ----------
 
-		gdict: OD demands dict
+        gdict: OD demands dict
 
-	    Returns
-	    -------
-	    An nx object.
+        Returns
+        -------
+        An nx object.
 
-	    """
-
-        self.build_TAP(self.G_supergraph)
+        """
+        self.TAP = self.build_TAP(self.G_supergraph, n_iter=n_iter)
         t0 = time.process_time()
-        self.TAP.run_social(fcoeffs=self.fcoeffs, build_t0=build_t0, exogenous_G=exogenous_G)
+        TT, d_norm = self.TAP.run_social_capacity(fcoeffs=self.fcoeffs, build_t0=build_t0, exogenous_G=exogenous_G, d_step=d_step)
         runtime = time.process_time() - t0
         self.G_supergraph = self.TAP.graph
 
-        return runtime
+        return TT[1:], d_norm[1:], runtime
 
     def set_fcoeffs(self, fcoeff):
         """
@@ -323,7 +323,7 @@ class tNet():
         self.totalDemand = sum(g.values())
         self.g = g
         self.gGraph = buildDemandGraph(g)
-        self.TAP = self.build_TAP(self.G)
+        #self.TAP = self.build_TAP(self.G)
 
     def read_flow_file(self, fname):
         """
@@ -472,19 +472,46 @@ def plot_network_flows(G, weight='flow', width=3, cmap=plt.cm.Blues):
     nx.draw_networkx_edge_labels(G, pos=pos, edge_labels=labels)
     return fig, ax
 
+def plot_network(G, ax, edgelist=None, edge_width=0.1,
+	edgecolors='k', nodecolors='k', nodesize=1, arrowstyle='fancy', arrowsize=0.1, edge_alpha=1, linkstyle='-', connectstyle='arc3, rad=0.05', cmap=plt.cm.inferno_r, vmin=0, vmax=1):
+    if edgelist == None:
+        edgelist = list(G.edges())
+    pos = nx.get_node_attributes(G, 'pos')
+    nx.draw(G, pos,
+                edgelist=edgelist,
+                width=edge_width,
+                ax=ax,
+                edge_color=edgecolors,
+                node_size=nodesize,
+                node_color=nodecolors,
+                connectionstyle=connectstyle,
+                #arrowstyle=None,
+                arrowsize=arrowsize,
+                alpha=edge_alpha,
+                style=linkstyle,
+                edge_cmap=cmap,
+                edge_vmin=vmin, edge_vmax=vmax)
+    #else:
+    #    nx.draw(G, pos, width=edge_width,
+    #            ax=ax, edge_color=edgecolors,
+    #            node_size=nodesize, node_color=nodecolors,
+    #            #connectionstyle='arc3, rad=0.04',
+    #            arrowsize=0.5, arrowstyle='fancy',
+    #            alpha=edge_alpha, style=linkstyle)
+'''
 def plot_network(G, width=1, cmap=plt.cm.Blues):
     # TODO: add explaination
     fig, ax = plt.subplots()
     pos = nx.get_node_attributes(G, 'pos')
     #edges = list(G.edges())
     #nx.draw(G, pos, node_color='b', edgelist=edges, edge_color=weights, width=width, edge_cmap=cmap)
-    nx.draw(G, pos, node_color='k',  width=width, edge_cmap=cmap, arrowsize=4, node_size=15, alpha=0.7,
+    nx.draw(G, pos, node_color='k',  width=width, edge_cmap=cmap, arrowsize=1, node_size=1, alpha=0.7,
         connectionstyle='arc3, rad=0.04'
             )
     #labels = {(i, j): int(G[i][j][weight]) for i, j in G.edges()}
     #nx.draw_networkx_edge_labels(G, pos=pos, with_labels=True)
     return fig, ax
-
+'''
 def perturbDemandConstant(g, constant):
     """
     Perturb demand by a random constant value

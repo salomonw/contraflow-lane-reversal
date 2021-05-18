@@ -92,7 +92,7 @@ class TrafficAssignment(object):
     .. [1] Juan de Dios Ortuzar and Luis G. Willumsen (2011) Modelling Transport, Fourth Edition. John Wiley and Sons.
     """
 
-    def __init__(self, graph, od_graph, od_matrix=None, fcoeffs=[1,0,0,0,0.15,0], threshold=5e-4, iterations=400):
+    def __init__(self, graph, od_graph, od_matrix=None, fcoeffs=[1,0,0,0,0.15,0], threshold=5e-8, iterations=400):
 
         self.graph = graph
         self.od_graph = od_graph
@@ -109,6 +109,7 @@ class TrafficAssignment(object):
 
         self.temp_list = []
         self.od_paths = collections.defaultdict(dict)
+
         pass
 
     def get_edge_attribute(self, edge, attribute):
@@ -159,6 +160,7 @@ class TrafficAssignment(object):
         ods = [(s,t) for s,t in self.od_graph.edges()]
         results = pool.map(self.solve_and_assign_sp, ods)
         self.LBD += sum([lbds for lbds, flows in results])
+        nx.set_edge_attributes(self.graph, 0, name='help_flow')
         for lbds, flows in results:
             for a, flow in flows.items():
                 self.graph[a[0]][a[1]]['help_flow'] += flow
@@ -167,6 +169,8 @@ class TrafficAssignment(object):
         [self.set_edge_attribute(edge, 'flow', (1 - phi) * self.get_edge_attribute(edge, 'flow') + \
             phi * self.get_edge_attribute(edge, 'help_flow')) or edge in self.graph.edges() for edge in self.graph.edges()]
 
+    def set_flows_from_help_flows(self):
+        [self.set_edge_attribute(edge, 'flow', self.get_edge_attribute(edge, 'help_flow')) or edge in self.graph.edges() for edge in self.graph.edges()]
 
     def calculate_traveltime_social_edge_exo(self, edge,  fcoeffs, exogenous_G=False):
          self.set_edge_attribute(edge, 't_k',  self.get_edge_attribute(edge, 't_0') * sum([fcoeffs[i] * \
@@ -202,8 +206,8 @@ class TrafficAssignment(object):
 
     #@timeit
     def stopping_criteria(self):
-        TT = self.calculate_total_travel_time()
-        self.RG = abs((TT-self.LBD)/self.LBD)
+        self.TT = self.calculate_total_travel_time()
+        self.RG = ((self.TT-self.LBD)/self.LBD)
         if self.RG <= self.threshold:
             return True
         else:
@@ -252,6 +256,7 @@ class TrafficAssignment(object):
         ub = 1
         lb = 0
         for n in range(bisection_n): #Solve issue with exogenous
+            #print(l)
             dx1dl = sum(get_travel_time_social(x=l*self.get_edge_attribute(edge, 'help_flow')+(1-l)*self.get_edge_attribute(edge, 'flow'),\
                                     m=self.get_edge_attribute(edge, 'capacity'),\
                                     t0=self.get_edge_attribute(edge, 't_0'),
@@ -263,12 +268,13 @@ class TrafficAssignment(object):
             else:
                 lb = l
             l = (ub - lb) / 2
-
+        #plt.pause(3)
         return l
 
 
     def run(self, fcoeffs=[1,0,0,0,0.15,0], build_t0=False, exogenous_G=False):
         pool = mp.Pool(mp.cpu_count()-1)
+        TT= []
         # assign od matrix to od graph (if matrix is given)
         if self.od_matrix is not None:
             self.set_od_matix(self.od_matrix)
@@ -279,47 +285,9 @@ class TrafficAssignment(object):
         self.set_initial_traveltimes()
         self.assert_t0_exists()
         # set initial flow = 0
-        self.set_initial_flow()
-        # set initial help flow = 0
-        self.set_initial_help_flow()
-        # check network if every source and target can be reached
-        self.check_network_connections()
-        phi = 1
-        self.RG=99
-        for i in range(1, self.n_iter_tm):
-            # calculate auxiliary flows
-            self.calculate_auxiliary_flows(pool)
-            # calculating the flow using auxiliary flow
-            self.calculate_flows(phi)
-            # save old traveltimes
-            self.set_help_traveltime()
-            # calculate new traveltime
-            self.calculate_traveltime(fcoeffs=fcoeffs, exogenous_G=exogenous_G)
-            #update phi
-            phi = self.calculate_phi()
-            # stopping criteria
-            #print("i: " + str(i) + '\t RG: ' + str(self.RG))
-            if self.stopping_criteria():
-                #print("i: " + str(i) + '\t RG: ' + str(self.RG))
-                pool.close()
-                break
-        pool.close()
-
-    def run_social(self, fcoeffs=[1, 0, 0, 0, 0.15, 0], build_t0=False, exogenous_G=False):
-        pool = mp.Pool(mp.cpu_count()-1)
-        # assign od matrix to od graph (if matrix is given)
-        if self.od_matrix is not None:
-            self.set_od_matix(self.od_matrix)
-        # calculate traveltime at t=0
-        if build_t0:
-            self.calculate_initial_traveltime()
-        # set traveltime equal to initial traveltime
-        self.set_initial_traveltimes()
-        self.assert_t0_exists()
-        # set initial flow = 0
-        self.set_initial_flow()
-        # set initial help flow = 0
-        self.set_initial_help_flow()
+        self.calculate_auxiliary_flows(pool)
+        self.set_flows_from_help_flows()
+        self.calculate_traveltime(fcoeffs=fcoeffs, exogenous_G=exogenous_G)
         # check network if every source and target can be reached
         self.check_network_connections()
         phi = 1
@@ -327,22 +295,210 @@ class TrafficAssignment(object):
         for i in range(1, self.n_iter_tm):
             # calculate auxiliary flows
             self.calculate_auxiliary_flows(pool)
+            #update phi
+            #phi = self.calculate_phi()
+            phi=1/i
+            # calculating the flow using auxiliary flow
+            self.calculate_flows(phi)
+            # save old traveltimes
+            self.set_help_traveltime()
+            # calculate new traveltime
+            self.calculate_traveltime(fcoeffs=self.fcoeffs, exogenous_G=exogenous_G)
+            # stopping criteria
+            tt = get_obj(self.graph, self.fcoeffs)
+            print("i: " + str(i - 1) + '\t RG: ' + str(round(float(self.RG), 5)) + '\t TT: ' + str(round(float(tt), 0)) + '\t phi: ' + str(round(float(phi), 4)))
+            #print("i: " + str(i) + '\t RG: ' + str(self.RG))
+            if self.stopping_criteria():
+                #print("i: " + str(i) + '\t RG: ' + str(self.RG))
+                print("i: " + str(i - 1) + '\t RG: ' + str(round(float(self.RG), 5)) + '\t TT: ' + str(round(float(tt), 0)) + '\t phi: ' + str(round(float(phi), 4)))
+                pool.close()
+                break
+            TT.append(self.TT)
+        pool.close()
+        return TT
+
+    def run_social(self, fcoeffs=[1, 0, 0, 0, 0.15, 0], build_t0=False, exogenous_G=False):
+        pool = mp.Pool(mp.cpu_count()-1)
+        TT = []
+        # assign od matrix to od graph (if matrix is given)
+        if self.od_matrix is not None:
+            self.set_od_matix(self.od_matrix)
+        # calculate traveltime at t=0
+        if build_t0:
+            self.calculate_initial_traveltime()
+        # set traveltime equal to initial traveltime
+        self.set_initial_traveltimes()
+        self.assert_t0_exists()
+        # set initial flow = 0
+        self.calculate_auxiliary_flows(pool)
+        self.set_flows_from_help_flows()
+        self.calculate_traveltime_social(fcoeffs=fcoeffs, exogenous_G=exogenous_G)
+        # check network if every source and target can be reached
+        self.check_network_connections()
+        phi = 1
+        self.RG = 99
+        for i in range(1, self.n_iter_tm):
+            # calculate auxiliary flows
+            self.calculate_auxiliary_flows(pool)
+            # update phi
+            phi = 1/i
+            #phi = self.calculate_phi_social()
             # calculating the flow using auxiliary flow
             self.calculate_flows(phi)
             # save old traveltimes
             self.set_help_traveltime()
             # calculate new traveltime
             self.calculate_traveltime_social(fcoeffs=fcoeffs, exogenous_G=exogenous_G)
-            # update phi
-            phi = self.calculate_phi()
+            # calculate total cost
+            tt = get_obj(self.graph, self.fcoeffs)
             # stopping criteria
-            #print("i: " + str(i-1) + '\t RG: ' + str(self.RG))
             if self.stopping_criteria():
+                print("i: " + str(i - 1) + '\t RG: ' + str(round(float(self.RG), 5)) + '\t TT: ' + str(
+                    round(float(tt), 0)) + '\t phi: ' + str(round(float(phi), 4)))
                 #print("i: " + str(i) + '\t RG: ' + str(self.RG))
                 pool.close()
                 break
+            print("i: " + str(i - 1) + '\t RG: ' + str(round(float(self.RG), 5)) + '\t TT: ' + str(
+                round(float(tt), 0)) + '\t phi: ' + str(round(float(phi), 4)))
+            TT.append(self.TT)
         pool.close()
+        return TT
 
+
+
+    def run_social_capacity(self, fcoeffs=[1, 0, 0, 0, 0.15, 0], build_t0=False, exogenous_G=False, d_step=1):
+        pool = mp.Pool(mp.cpu_count()-1)
+        TT = []
+        d_norm = []
+        # assign od matrix to od graph (if matrix is given)
+        if self.od_matrix is not None:
+            self.set_od_matix(self.od_matrix)
+        # calculate traveltime at t=0
+        if build_t0:
+            self.calculate_initial_traveltime()
+        # set traveltime equal to initial traveltime
+        self.set_initial_traveltimes()
+        self.assert_t0_exists()
+        # set initial flow = 0
+        self.calculate_auxiliary_flows(pool)
+        self.set_flows_from_help_flows()
+        self.calculate_traveltime_social(fcoeffs=fcoeffs, exogenous_G=exogenous_G)
+        self.check_network_connections()
+        self.RG = 99
+        for i in range(1, self.n_iter_tm):
+            d, b = self.get_capacity_derivative(delta=1, pool=pool)
+            dnorm = sum([i ** 2 for i in d.values()])
+            # d_step=d_step/i
+            if i >= 30:
+                # make a step on a capacity direction
+                self.update_capacity(d, d_step)
+            d_norm.append(dnorm)
+            # calculate auxiliary flows
+            self.calculate_auxiliary_flows(pool)
+            # update phi
+            phi = 1/i
+            #phi = self.calculate_phi_social()
+            # calculating the flow using auxiliary flow
+            self.calculate_flows(phi)
+            # save old traveltimes
+            self.set_help_traveltime()
+            # calculate new travel time
+            #self.calculate_traveltime(fcoeffs=fcoeffs, exogenous_G=exogenous_G)
+            self.calculate_traveltime_social(fcoeffs=self.fcoeffs, exogenous_G=exogenous_G)
+            #phi = self.calculate_phi()
+            # stopping criteria
+            if self.stopping_criteria():
+                tt = get_obj(self.graph, self.fcoeffs)
+                #print("i: " + str(i - 1) + '\t RG: ' + str(round(float(self.RG), 5)) + '\t d_norm: ' + str(round(float(dnorm), 0)) + '\t TT: ' + str(round(float(tt), 0)) + '\t phi: ' + str(round(float(phi), 4)))
+                TT.append(tt)
+                pool.close()
+                break
+            #tt = self.calculate_traveltime(fcoeffs=fcoeffs, exogenous_G=exogenous_G)
+            #tt = self.calculate_total_travel_time() #sum([get_travel_time(x, m, t0,  fcoeffs, exo=0) for ])#self.TT
+            tt = get_obj(self.graph, self.fcoeffs)
+            print("i: " + str(i - 1) + '\t RG: ' + str(round(float(self.RG), 5)) + '\t d_norm: ' + str(round(float(dnorm), 0)) + '\t TT: ' + str(round(float(tt), 0)) + '\t phi: ' + str(round(float(phi), 4)))
+            TT.append(tt)
+        pool.close()
+        return TT, d_norm
+
+
+
+
+    def get_capacity_derivative(self, delta=1e-1, pool=False):
+        d = {}
+        args = [(self.graph[i][j]['flow'], self.graph[j][i]['flow'], self.graph[i][j]['t_0'], self.graph[j][i]['t_0'], self.graph[i][j]['capacity'],
+                 self.graph[j][i]['capacity'], self.fcoeffs, delta) for i, j in self.graph.edges()]
+        results = pool.map(get_derivative_ij, args)
+        # print(results)
+        k = 0
+        for i, j in self.graph.edges():
+            d[(i, j)] = results[k]
+            k += 1
+        # manager = Manager()
+        # d = manager.dict()
+        # job = [Process(target=get_derivative_ij, args=(G[i][j]['flow'], G[j][i]['flow'], G[i][j]['t_0'], G[j][i]['t_0'], G[i][j]['capacity'], G[j][i]['capacity'], fcoeffs, delta)) for i,j in G.edges()]
+        # _ = [p.start() for p in job]
+        # _ = [p.join() for p in job]
+        # print(d)
+
+        # for i,j in G.edges():
+        #    v = get_derivative_ij(G[i][j]['flow'], G[j][i]['flow'], G[i][j]['t_0'], G[j][i]['t_0'], G[i][j]['capacity'], G[j][i]['capacity'], fcoeffs, delta)
+        #    d[(i,j)] = v
+
+        if len(d) > 0:
+            a = max(d, key=d.get)
+            return d, a
+        else:
+            return {}, (0, 0)
+        '''
+        # Find derivatives
+        GC = self.graph.copy()
+        g = {}
+        # Case 1: Find derivative estimates by assuming fixed routes
+        d = {}
+        for i, j in GC.edges():
+            t0 = eval_tt_funct(GC, self.fcoeffs, GC[i][j]['capacity'], i, j)
+            tinv0 = eval_tt_funct(GC, self.fcoeffs, GC[j][i]['capacity'], j, i)
+            GC[i][j]['capacity'] += delta
+            GC[j][i]['capacity'] -= delta
+            t = eval_tt_funct(GC, self.fcoeffs, GC[i][j]['capacity'], i, j)
+            tinv = eval_tt_funct(GC, self.fcoeffs, GC[j][i]['capacity'], j, i)
+
+            v = ((t + tinv) - (t0 + tinv0)) / delta
+            d[(i, j)] = v
+            GC[i][j]['capacity'] -= delta
+            GC[j][i]['capacity'] += delta
+
+        if len(d) > 0:
+            a = max(d, key=d.get)
+            return d, a
+        else:
+            return {}, (0, 0)
+        '''
+
+    def update_capacity(self, d, d_step=9e-2, t=1):
+        gamma0 = {(i, j): d_step/t for i, j in self.graph.edges()}
+        gamma = gamma0
+        #k = {(i, j): 1 for i, j in self.graph.edges()}
+        V = []
+        for (i, j), g in d.items():
+            v = gamma[(i, j)] * g
+            m = 1500
+            if (i,j) not in V:
+                max_c = self.graph[i][j]['max_capacity']
+                if self.graph[i][j]['capacity'] - v > max_c - m and self.graph[j][i]['capacity'] + v <= m:
+                    self.graph[i][j]['capacity'] = max_c - m
+                    self.graph[j][i]['capacity'] = m
+                elif self.graph[i][j]['capacity'] - v <= m and self.graph[j][i]['capacity'] + v > max_c-m:
+                    self.graph[i][j]['capacity'] = m
+                    self.graph[j][i]['capacity'] = max_c - m
+                else:
+                    self.graph[i][j]['capacity'] -= v
+                    self.graph[j][i]['capacity'] += v
+                V.append((j, i))
+            #gamma[(i, j)] = gamma0[(i, j)] / k[(i, j)] #*np.exp(-decay*k[(i,j)]/10)  #/(k[(i,j)]**(1/4))
+            #k[(j, i)] += 1
+            #k[(i, j)] += 1
 
 
     def get_traveltime(self):
@@ -423,6 +579,24 @@ class TrafficAssignment(object):
             assert (self.get_edge_attribute(edge,'t_0') > 0) ,"Edge: "+str(edge)+" has t_0 = 0 or t_0 not exists!!"
 
 
+def get_derivative_ij(args):
+    xij, xji, t0ij, t0ji, mij, mji, fcoeffs, delta = args
+    t0 = eval_tt_funct(xij, t0ij, mij, fcoeffs)
+    tinv0 = eval_tt_funct(xji, t0ji, mji, fcoeffs)
+    mij += delta
+    mji -= delta
+    t = eval_tt_funct(xij, t0ij, mij, fcoeffs)
+    tinv = eval_tt_funct(xji, t0ji, mji, fcoeffs)
+    v = ((t + tinv) - (t0 + tinv0)) / (delta)
+    return v
+
+def get_obj(G, fcoeffs):
+    return sum(G[i][j]['flow'] * G[i][j]['t_0'] * sum(
+        [fcoeffs[n] * (G[i][j]['flow'] / G[i][j]['capacity']) ** n for n in range(len(fcoeffs))]) for i, j in
+               G.edges())
+
+def eval_tt_funct(flow, t0, m, fcoeffs):
+    return flow * t0 * sum([fcoeffs[n] * (flow / m) ** (n) for n in range(len(fcoeffs))])
 
 def get_travel_time(x, m, t0,  fcoeffs, exo=0):
         return t0 *sum(fcoeffs[i]*(x+exo/m)**i for i in range(len(fcoeffs)))

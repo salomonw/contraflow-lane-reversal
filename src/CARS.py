@@ -1,4 +1,3 @@
-
 from gurobipy import *
 import pwlf as pw
 import numpy as np
@@ -22,12 +21,12 @@ def eval_travel_time(x, fcoeffs):
 
 
 def eval_pw(a, b, theta, x):
-    theta2  = theta.copy()
+    theta2 = theta.copy()
     theta2.append(1000)
     for i in range(len(theta2)-1):
-        if (theta2[i]<=x) and (theta2[i+1]>x):
-            y =  b[i]+a[i]*x
-    return  y
+        if (theta2[i] <= x) and (theta2[i+1] > x):
+            y = b[i] + a[i]*x
+    return y
 
 
 
@@ -140,13 +139,16 @@ def add_rebalancing_cnstr(m, tnet, xu):
     m.update()
 
 @timeit
-def set_optimal_flows(m , tnet, G_exogenous=False, bush=False):
+def set_optimal_flows(m , tnet, rebalancing=True, G_exogenous=False, bush=False):
     if bush:
         for i,j in tnet.G_supergraph.edges():
             tnet.G_supergraph[i][j]['flowNoRebalancing'] = sum(m.getVarByName('x^' + str(s) + '_' + str(i) + '_' + str(j)).X for s in tnet.O)
             tnet.G_supergraph[i][j]['flow'] = tnet.G_supergraph[i][j]['flowNoRebalancing']
             if isinstance(i, int) and isinstance(j, int):
-                tnet.G_supergraph[i][j]['flowRebalancing'] = m.getVarByName('x^R' + str(i) + '_' + str(j)).X
+                if rebalancing:
+                    tnet.G_supergraph[i][j]['flowRebalancing'] = m.getVarByName('x^R' + str(i) + '_' + str(j)).X
+                else:
+                    tnet.G_supergraph[i][j]['flowRebalancing'] = 0
                 tnet.G_supergraph[i][j]['flow'] += tnet.G_supergraph[i][j]['flowRebalancing']
             #else:
             #tnet.G_supergraph[i][j]['flow'] = tnet.G_supergraph[i][j]['flowRebalancing'] + tnet.G_supergraph[i][j]['flowNoRebalancing']
@@ -156,7 +158,10 @@ def set_optimal_flows(m , tnet, G_exogenous=False, bush=False):
             tnet.G_supergraph[i][j]['flowNoRebalancing'] = sum(m.getVarByName('x^' + str(w) + '_' + str(i) + '_' + str(j)).X for w in tnet.g.keys())
             tnet.G_supergraph[i][j]['flow'] = tnet.G_supergraph[i][j]['flowNoRebalancing']
             if isinstance(i, int) and isinstance(j, int):
-                tnet.G_supergraph[i][j]['flowRebalancing'] = m.getVarByName('x^R' + str(i) + '_' + str(j)).X
+                if rebalancing:
+                    tnet.G_supergraph[i][j]['flowRebalancing'] = m.getVarByName('x^R' + str(i) + '_' + str(j)).X
+                else:
+                    tnet.G_supergraph[i][j]['flowRebalancing'] = 0
                 tnet.G_supergraph[i][j]['flow'] += tnet.G_supergraph[i][j]['flowRebalancing']
 
             #else:
@@ -402,7 +407,7 @@ def solve_bush_CARSn(tnet, fcoeffs, n=3, exogenous_G=False, rebalancing=True, li
     exogenous_G = set_exogenous_flow(tnet, exogenous_G)
     # Start model
     m = Model('CARS')
-    m.setParam('OutputFlag',0 )
+    m.setParam('OutputFlag',0)
     m.setParam('BarHomogeneous', 1)
     #m.setParam("LogToConsole", 0)
     #m.setParam("CSClientLog", 0)
@@ -434,7 +439,7 @@ def solve_bush_CARSn(tnet, fcoeffs, n=3, exogenous_G=False, rebalancing=True, li
     if rebalancing == True:
         [m.addVar(lb=0, name='x^R'+str(i)+'_'+str(j)) for i,j in tnet.G.edges()]
     else:
-        [m.addVar(lb=0, ub=0, name='x^R' + str(i) + '_' + str(j)) for i, j in tnet.G.edges()]
+        [m.addVar(lb=0, ub=0.001, name='x^R' + str(i) + '_' + str(j)) for i, j in tnet.G.edges()]
 
     [m.addVar(name='e^'+str(l)+'_'+str(i)+'_'+str(j), \
               lb=0 )\
@@ -469,7 +474,7 @@ def solve_bush_CARSn(tnet, fcoeffs, n=3, exogenous_G=False, rebalancing=True, li
     #print('solver stats: ' + status[GRB.OPTIMAL])
 
     # saving  results
-    set_optimal_flows(m, tnet, G_exogenous=exogenous_G, bush=bush)
+    set_optimal_flows(m, tnet, rebalancing=rebalancing, G_exogenous=exogenous_G, bush=bush)
     tnet.cars_obj = obj.getValue()
     if od_flows_flag==True:
         od_flows = get_OD_result_flows(m, tnet, bush=bush)

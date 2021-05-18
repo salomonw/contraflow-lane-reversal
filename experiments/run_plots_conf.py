@@ -10,7 +10,7 @@ def plot_diff_gs(gs, obj0, objILP, objfluid, objfluidInt):
     ax.plot(gs, objfluidInt, label='$\\mathcal{P}($Lower bound)', marker='o')
     ax.plot(gs, obj0, label='Original', marker='+')
     plt.xlabel('Demand multiplier')
-    plt.ylabel('Performance (\\%)')
+    plt.ylabel('Deviation from optimal (\\%)')
     plt.xlim((min(gs), max(gs)))
     plt.tight_layout()
     plt.legend()
@@ -38,3 +38,8 @@ plt.ylabel('$J^{\\text{LP}}_k/J^{\\text{Original}}$')
 plt.xlim([0, max(max_lanes_vec)])
 plt.tight_layout()
 plt.savefig(out_dir+'/sparse_LA.pdf')
+
+
+#out_dir = 'results/'+dir_out +'_'+ net_name
+
+
