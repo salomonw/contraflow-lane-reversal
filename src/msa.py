@@ -175,14 +175,14 @@ class TrafficAssignment(object):
     def calculate_traveltime_social_edge_exo(self, edge,  fcoeffs, exogenous_G=False):
          self.set_edge_attribute(edge, 't_k',  self.get_edge_attribute(edge, 't_0') * sum([fcoeffs[i] * \
                                     ((self.get_edge_attribute(edge, 'flow')+exogenous_G[edge[0]][edge[1]]['flow'])/self.get_edge_attribute(edge, 'capacity'))**(i) for i in range(len(fcoeffs))]) \
-                                    + self.get_edge_attribute(edge, 't_0') *  sum([fcoeffs[i+1]*(i+1)\
-                                    *((self.get_edge_attribute(edge, 'flow')+exogenous_G[edge[0]][edge[1]]['flow'])/self.get_edge_attribute(edge, 'capacity'))**(i) for i in range(len(fcoeffs)-1)]))
+                                    + self.get_edge_attribute(edge, 't_0') * sum([fcoeffs[i]*(i)\
+                                    *((self.get_edge_attribute(edge, 'flow')+exogenous_G[edge[0]][edge[1]]['flow'])**(i-1)/self.get_edge_attribute(edge, 'capacity')**i) for i in range(1,len(fcoeffs))]))
 
     def calculate_traveltime_social_edge(self, edge,  fcoeffs):
         self.set_edge_attribute(edge, 't_k',  self.get_edge_attribute(edge, 't_0') * sum([fcoeffs[i] * \
                                 ((self.get_edge_attribute(edge, 'flow'))/self.get_edge_attribute(edge, 'capacity'))**(i) for i in range(len(fcoeffs))]) \
-                                + self.get_edge_attribute(edge, 't_0') *  sum([fcoeffs[i+1]*(i+1)\
-                                *((self.get_edge_attribute(edge, 'flow'))/self.get_edge_attribute(edge, 'capacity'))**(i) for i in range(len(fcoeffs)-1)]))
+                                + self.get_edge_attribute(edge, 't_0') *  sum([fcoeffs[i]*(i)\
+                                *((self.get_edge_attribute(edge, 'flow'))**(i-1)/self.get_edge_attribute(edge, 'capacity')**(i)) for i in range(1, len(fcoeffs))]))
 
     #@timeit
     def calculate_traveltime_social(self, fcoeffs, exogenous_G=False):
@@ -232,7 +232,7 @@ class TrafficAssignment(object):
         return sum([self.get_edge_attribute(edge, 't_k')*self.get_edge_attribute(edge, 'flow') for edge in self.graph.edges()])
 
     #@timeit
-    def calculate_phi(self, bisection_n=10, exogenous_G=False):
+    def calculate_phi(self, bisection_n=20, exogenous_G=False):
         l = 1/2
         ub = 1
         lb = 0
@@ -247,30 +247,70 @@ class TrafficAssignment(object):
                 ub = l
             else:
                 lb = l
-            l = (ub - lb) / 2
+            if n < bisection_n:
+                l = (ub - lb) / 2
         return l
 
     #@timeit
-    def calculate_phi_social(self, bisection_n=10, exogenous_G=False):
-        l = 1/2
-        ub = 1
-        lb = 0
-        for n in range(bisection_n): #Solve issue with exogenous
-            #print(l)
-            dx1dl = sum(get_travel_time_social(x=l*self.get_edge_attribute(edge, 'help_flow')+(1-l)*self.get_edge_attribute(edge, 'flow'),\
-                                    m=self.get_edge_attribute(edge, 'capacity'),\
-                                    t0=self.get_edge_attribute(edge, 't_0'),
-                                    fcoeffs=self.fcoeffs) \
-                    * (self.get_edge_attribute(edge, 'help_flow') - self.get_edge_attribute(edge, 'flow')) \
-                    for edge in self.graph.edges())
-            if dx1dl>0:
-                ub = l
-            else:
-                lb = l
-            l = (ub - lb) / 2
-        #plt.pause(3)
-        return l
+    def calculate_phi_social(self, bisection_n=10, exogenous_G=False, method_='bisection'):
+        if method_ == 'bisection':
+            l = 1/2
+            ub = 1
+            lb = 0
 
+            for n in range(bisection_n): #Solve issue with exogenous
+                f = 0
+                for edge in self.graph.edges():
+                    x_star = self.get_edge_attribute(edge, 'help_flow')
+                    x = self.get_edge_attribute(edge, 'flow')
+                    x_target = l*x_star + (1-l)*x
+                    f += get_travel_time_social(x=x_target,
+                                            m=self.get_edge_attribute(edge, 'capacity'),
+                                            t0=self.get_edge_attribute(edge, 't_0'),
+                                            fcoeffs=self.fcoeffs)*(x_star-x)
+                if f > 0:
+                    ub = l
+                else:
+                    lb = l
+                l = (ub - lb) / 2
+            #print(l)
+            return l
+        if method_ == 'newton':
+            # f2 requires derivative of travel function.
+            f = 1
+            fa = 0
+            l = 1/2
+            while f > 0.001 and f != fa:
+                fa = f
+                f = 0
+                f2 = 0
+                for edge in self.graph.edges():
+                    x_star = self.get_edge_attribute(edge, 'help_flow')
+                    x = self.get_edge_attribute(edge, 'flow')
+                    x_tar = l*x_star + (1 - l)*x
+
+                    f += get_travel_time_social(
+                        x=x_tar,
+                        m=self.get_edge_attribute(edge, 'capacity'),
+                        t0=self.get_edge_attribute(edge, 't_0'),
+                        fcoeffs=self.fcoeffs) * (x_star - x)
+
+                    f2 += get_travel_time_derivative_social(
+                        x=x_tar,
+                        m=self.get_edge_attribute(edge, 'capacity'),
+                        t0=self.get_edge_attribute(edge, 't_0'),
+                        fcoeffs=self.fcoeffs
+                    )*((x_star - x)**2)
+
+                #print(f)
+                #print(f2)
+                #pause
+                l = l - f/f2
+
+                l = max(min(0.999, l), 0.0001)
+                #print(f)
+
+            return l
 
     def run(self, fcoeffs=[1,0,0,0,0.15,0], build_t0=False, exogenous_G=False):
         pool = mp.Pool(mp.cpu_count()-1)
@@ -341,8 +381,8 @@ class TrafficAssignment(object):
             # calculate auxiliary flows
             self.calculate_auxiliary_flows(pool)
             # update phi
-            phi = 1/i
-            #phi = self.calculate_phi_social()
+            #phi = 1/i
+            phi = self.calculate_phi_social()
             # calculating the flow using auxiliary flow
             self.calculate_flows(phi)
             # save old traveltimes
@@ -364,8 +404,6 @@ class TrafficAssignment(object):
         pool.close()
         return TT
 
-
-
     def run_social_capacity(self, fcoeffs=[1, 0, 0, 0, 0.15, 0], build_t0=False, exogenous_G=False, d_step=1):
         pool = mp.Pool(mp.cpu_count()-1)
         TT = []
@@ -385,13 +423,14 @@ class TrafficAssignment(object):
         self.calculate_traveltime_social(fcoeffs=fcoeffs, exogenous_G=exogenous_G)
         self.check_network_connections()
         self.RG = 99
+        self.n_iter_tm = 400
         for i in range(1, self.n_iter_tm):
-            d, b = self.get_capacity_derivative(delta=1, pool=pool)
+            d, b = self.get_capacity_derivative(delta=0.1, pool=pool)
             dnorm = sum([i ** 2 for i in d.values()])
-            # d_step=d_step/i
-            if i >= 30:
+            if i >= 0:
                 # make a step on a capacity direction
-                self.update_capacity(d, d_step)
+                alpha_1 = self.update_capacity(d, d_step, t=i)
+                #alpha_1 = 1 / i
             d_norm.append(dnorm)
             # calculate auxiliary flows
             self.calculate_auxiliary_flows(pool)
@@ -416,13 +455,11 @@ class TrafficAssignment(object):
             #tt = self.calculate_traveltime(fcoeffs=fcoeffs, exogenous_G=exogenous_G)
             #tt = self.calculate_total_travel_time() #sum([get_travel_time(x, m, t0,  fcoeffs, exo=0) for ])#self.TT
             tt = get_obj(self.graph, self.fcoeffs)
-            print("i: " + str(i - 1) + '\t RG: ' + str(round(float(self.RG), 5)) + '\t d_norm: ' + str(round(float(dnorm), 0)) + '\t TT: ' + str(round(float(tt), 0)) + '\t phi: ' + str(round(float(phi), 4)))
+            print('i: {}\tRG:{}\tdnorm: {}\tTT: {}\ta_1: {}\ta_2: {}\t'.format(
+                i-1, self.RG, dnorm, tt, alpha_1, phi))
             TT.append(tt)
         pool.close()
         return TT, d_norm
-
-
-
 
     def get_capacity_derivative(self, delta=1e-1, pool=False):
         d = {}
@@ -476,10 +513,41 @@ class TrafficAssignment(object):
             return {}, (0, 0)
         '''
 
+    def bisection_capacity(self, m_derivative, bisection_n=10, method_='bisection'):
+        if method_ == 'bisection':
+            l = 1 / 2
+            ub = 1
+            lb = 0
+            for n in range(bisection_n):  # Solve issue with exogenous
+                f = 0
+                for edge in self.graph.edges():
+                    m = self.get_edge_attribute(edge, 'capacity')
+                    if m_derivative[edge[0], edge[1]] > 0:
+                        m_star = m + 1500
+                    else:
+                        m_star = m - 1500
+                    m_target = l*m_star - (1-l)*m
+                    f += get_travel_time_social(
+                        x=self.get_edge_attribute(edge, 'flow'),
+                        m=m_target,
+                        t0=self.get_edge_attribute(edge, 't_0'),
+                        fcoeffs=self.fcoeffs)\
+                        * (self.get_edge_attribute(edge, 'help_flow') - self.get_edge_attribute(edge, 'flow'))
+                #print(f)
+                if f > 0:
+                    ub = l
+                else:
+                    lb = l
+                l = (ub - lb) / 2
+            #print(l)
+            return l
+
     def update_capacity(self, d, d_step=9e-2, t=1):
-        gamma0 = {(i, j): d_step/t for i, j in self.graph.edges()}
+        #d_step = 9e-2
+        d_step = self.bisection_capacity(d)
+        #d_step = d_step/t
+        gamma0 = {(i, j): d_step for i, j in self.graph.edges()}
         gamma = gamma0
-        #k = {(i, j): 1 for i, j in self.graph.edges()}
         V = []
         for (i, j), g in d.items():
             v = gamma[(i, j)] * g
@@ -499,7 +567,7 @@ class TrafficAssignment(object):
             #gamma[(i, j)] = gamma0[(i, j)] / k[(i, j)] #*np.exp(-decay*k[(i,j)]/10)  #/(k[(i,j)]**(1/4))
             #k[(j, i)] += 1
             #k[(i, j)] += 1
-
+        return d_step
 
     def get_traveltime(self):
         traveltime = []
@@ -599,10 +667,27 @@ def eval_tt_funct(flow, t0, m, fcoeffs):
     return flow * t0 * sum([fcoeffs[n] * (flow / m) ** (n) for n in range(len(fcoeffs))])
 
 def get_travel_time(x, m, t0,  fcoeffs, exo=0):
-        return t0 *sum(fcoeffs[i]*(x+exo/m)**i for i in range(len(fcoeffs)))
+    return t0 * sum(fcoeffs[i]*(x+exo/m)**i for i in range(len(fcoeffs)))
+
+def get_travel_time_derivative(x, m, t0, fcoeffs, exo=0):
+    return t0 * sum(fcoeffs[i] * i * ((x + exo)**(i-1) / m**i) for i in range(1, len(fcoeffs)))
+
+def get_travel_time_derivative_cap(x, m, t0, fcoeffs, exo=0):
+    return t0 * sum(fcoeffs[i] * i * ((x + exo)**(i) / m**(i+1)) for i in range(1, len(fcoeffs)))
+
+def get_travel_time_second_derivative(x, m, t0, fcoeffs, exo=0):
+    return t0 * sum(fcoeffs[i] * (i-1) * i * ((x + exo)**(i-2) / m**i) for i in range(2, len(fcoeffs)))
+
+def get_travel_time_second_derivative_cap(x, m, t0, fcoeffs, exo=0):
+    return t0 * sum(fcoeffs[i] * (i-1) * i * ((x + exo)**(i) / m**(i+2)) for i in range(2, len(fcoeffs)))
 
 def get_travel_time_social(x, m, t0, fcoeffs, exo=0):
-    return t0 *sum(fcoeffs[i]*(x+exo/m)**i for i in range(len(fcoeffs))) + t0 * sum(fcoeffs[i+1]*(i+1)*(x+exo/m)**i for i in range(len(fcoeffs)-1))
+    return get_travel_time(x, m, t0,  fcoeffs, exo=0) + get_travel_time_derivative(x, m, t0,  fcoeffs, exo=0)
+
+def get_travel_time_derivative_social(x, m, t0, fcoeffs, exo=0):
+    f1 = get_travel_time_derivative(x, m, t0, fcoeffs, exo=0)
+    f2 = get_travel_time_second_derivative(x, m, t0, fcoeffs, exo=0)
+    return f1 + f2
 
 
 def get_dxdb(TAP, delta=0.05, divide=1, num_cores = False):
@@ -635,8 +720,6 @@ def get_dxdb(TAP, delta=0.05, divide=1, num_cores = False):
     dxdb = [pool.apply(get_dxdb_sing, (TAP, i)) for i in fcoeffs_i]
     pool.close()
     return dxdb
-
-
 
 def get_dxdb_sing(TAP, fcoeffs_i, delta=0.05, divide=1):
     """
@@ -721,9 +804,6 @@ def get_dxdg(G, gDict, k=1):
                 jacob[(s,t), (u,v)] = 0
     return jacob
 
-
-
-
 def kShortestPaths(G, source, target, k, weight=None):
     """
     Returns the k shortest paths from source to target
@@ -742,12 +822,3 @@ def kShortestPaths(G, source, target, k, weight=None):
 
     """
     return list(itertools.islice(nx.shortest_simple_paths(G, source, target, weight=weight), k))
-
-
-# =============================================================================
-# eof
-#
-# Local Variables:
-# mode: python
-# mode: linum
-# End:

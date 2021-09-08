@@ -1121,6 +1121,10 @@ def get_network_parameters(net_name, experiment_name='_'):
         netFile = "data/net/ChicagoSketch_net.txt"
         gFile = "data/trips/ChicagoSketch_trips.txt"
         fcoeffs = [1, 0, 0, 0, 0.15, 0]
+    elif net_name == 'test_9':
+        netFile = "data/net/test_9_net.txt"
+        gFile = "data/trips/test_9_trips.txt"
+        fcoeffs = [1, 0, 0, 0, 0.15, 0]
     tstamp = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
     dir_out = tstamp + "_"+ experiment_name
 

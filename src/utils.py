@@ -301,6 +301,19 @@ def txt2list(fname):
     return result
 
 @decorator
+def pool_KeyboardInt(f):
+    def new_f(*args, **kwargs):
+        try:
+            r = f(*args, **kwargs)
+        except KeyboardInterrupt:
+            print("Caught KeyboardInterrupt, terminating workers")
+            pool.terminate()
+            pool.join()
+        return r
+    return new_f
+
+
+@decorator
 def timeit(f):
     """
     time a function by applying a decorator

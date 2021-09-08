@@ -5,9 +5,8 @@ import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
 import matplotlib
-#import src.pwapprox as pw
 from gurobipy import *
-import pwlf as pw
+import src.pwapprox as pw
 from src.utils import *
 from datetime import datetime
 import experiments.build_NYC_subway_net as nyc
@@ -493,7 +492,10 @@ def solve_FW(tNet_, step, ax, n_iter):
     return tNet1, obj, TT, d_norm
 
 
-net_name = 'EMA_mid'
+#net_name = 'EMA'
+net_name = 'test_9'
+#net_name = 'EMA_mid'
+#net_name = 'Anaheim'
 #net_name = 'Anaheim'
 #net_name = 'Sioux Falls'
 #net_name = 'NYC'
@@ -504,7 +506,7 @@ tNet, fcoeffs = read_net(net_name)
 dir_out = datetime.now().strftime("%Y-%m-%d_%H:%M:%S") + "_" + 'contraflow'
 
 tNet.build_supergraph(identical_G=True)
-tNet.read_node_coordinates('data/pos/' + net_name + '.txt')
+#tNet.read_node_coordinates('data/pos/' + net_name + '.txt')
 #fig, ax = plt.subplots()
 #tnet.plot_network(tNet.G, ax)# width=0.3)
 #plt.show()
@@ -518,7 +520,7 @@ tNet, max_caps = integralize_inputs(tNet)
 
 out_dir = 'results/'+dir_out + '_'+ net_name
 
-exps = [0,0,0,0,1]
+exps = [0, 0, 0, 1, 0]
 n_lines_CARS = 5
 
 
@@ -674,7 +676,7 @@ if exps[3] == 1:
     objs = {}
     tNet0 = copy.deepcopy(tNet)
     mkdir_n(out_dir)
-    for g_mult in [1, 1.5, 2.0, 2.5]:
+    for g_mult in [1]:
         g_per = tnet.perturbDemandConstant(tNet0.g, g_mult)
         tNet.set_g(g_per)
         #print(min([tNet.G_supergraph[i][j]['max_capacity'] for i,j in tNet.G_supergraph.edges()]))
