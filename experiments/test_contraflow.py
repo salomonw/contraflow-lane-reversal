@@ -27,8 +27,6 @@ def read_net(net_name):
                                                                                experiment_name=net_name + '_n_variation')
         tNet = tnet.tNet(netFile=netFile, gFile=gFile, fcoeffs=fcoeffs)
     return tNet, fcoeffs
-
-
 def get_derivative_ij(args):
     xij, xji, t0ij, t0ji, mij, mji, fcoeffs, delta = args
     t0 = eval_tt_funct(xij, t0ij, mij, fcoeffs)
@@ -670,6 +668,8 @@ if exps[2] == 1:
     #print(tt_org)
     #print(tt_new)
     #print(tt_imp)
+
+
 
 # FOURTH EXPERIMENT (ALGORITHM COMPARISON)
 if exps[3] == 1:

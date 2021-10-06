@@ -36,7 +36,3 @@ def build_NYC_net(dir, only_road=False, symbls=False):
         return tNet, tstamp, fcoeffs, symbs
     else:
         return tNet, tstamp, fcoeffs
-
-
-
-

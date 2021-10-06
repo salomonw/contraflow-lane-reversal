@@ -8,8 +8,7 @@ import experiments.build_NYC_subway_net as nyc
 import random as random
 from src.utils import mkdir_n
 
-rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
-#rc('text', usetex=True)
+rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
 
 
 def run_n_variation(net_name, g_mult):
@@ -19,7 +18,7 @@ def run_n_variation(net_name, g_mult):
     TAP_obj = 1
     NLP_obj = 1
 
-    if net_name=='NYC':
+    if net_name == 'NYC':
         tNet, tstamp, fcoeffs = nyc.build_NYC_net('data/net/NYC_M/', only_road=True)
     else:
         netFile, gFile, fcoeffs, tstamp, dir_out = tnet.get_network_parameters(net_name=net_name,
@@ -32,6 +31,7 @@ def run_n_variation(net_name, g_mult):
     g_per = tnet.perturbDemandConstant(tNet.g, g_mult)
     tNet.set_g(g_per)
     tNet.build_supergraph(walk_multiplier=.001, identical_G=True)
+    tNet.TAP = tNet.build_TAP(tNet.G_supergraph)
     runtime, RG = cars.solveMSAsocialCARS(tNet, exogenous_G=False)
     NLP_obj = tnet.get_totalTravelTime(tNet.G_supergraph, fcoeffs=fcoeffs, G_exogenous=False)
     d0 = {'Net': net_name, 'A': tNet.nLinks, 'V': tNet.nNodes, 'W': tNet.nOD, 'type': 'system-centric', 'obj':NLP_obj, 't':runtime, 'RG':RG}
@@ -45,6 +45,7 @@ def run_n_variation(net_name, g_mult):
     g_per = tnet.perturbDemandConstant(tNet.g, g_mult)
     tNet.set_g(g_per)
     tNet.build_supergraph(walk_multiplier=.001, identical_G=True)
+    tNet.TAP = tNet.build_TAP(tNet.G_supergraph)
     runtime, RG = tNet.solveMSA(exogenous_G=False)
     TAP_obj = tnet.get_totalTravelTime(tNet.G, fcoeffs=fcoeffs, G_exogenous=False)
     d0 = {'Net': net_name, 'A': tNet.nLinks, 'V': tNet.nNodes, 'W': tNet.nOD, 'type': 'user-centric', 'obj':TAP_obj, 't':runtime, 'RG':RG}
@@ -91,12 +92,7 @@ def run_n_variation(net_name, g_mult):
     return d
 
 
-#nets = ['NYC_Uber_small_1']#, 'NYC_Uber_small_1','EMA_mid', 'NYC']
-#nets = ['Sioux Falls', 'Anaheim', 'EMA_mid', 'NYC']
-#nets = ['EMA_mid', 'NYC']
-nets = ['NYC']
-#nets = ['EMA']
-#nets = ['Sioux Falls', 'Anaheim', 'ChicagoSketch']
+nets = ['EMA']
 g_mult = [4]
 d_big = []
 outdir = 'results/variation/'

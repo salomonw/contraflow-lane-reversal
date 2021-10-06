@@ -1,10 +1,10 @@
 import networkx as nx
+import pandas as pd
 from gurobipy import *
 from src.utils import *
 import numpy as np
 import src.msa as msa
 import matplotlib.pyplot as plt
-import src.trafficAssignment.assign as ta
 from scipy.special import comb
 from scipy.linalg import block_diag
 import copy
@@ -233,7 +233,30 @@ class tNet():
 
 	    """
         t0 = time.process_time()
+        self.TAP = self.build_TAP(self.G, n_iter=300)
         self.TAP.run(fcoeffs=self.fcoeffs, build_t0=False, exogenous_G=exogenous_G)
+        runtime = time.process_time() - t0
+        self.G = self.TAP.graph
+        return runtime, self.TAP.RG
+
+    def solveMSA_social(self, exogenous_G=False):
+        """
+        Solve the MSA flows for a traffic network using the MSA module by
+        Jurgen Hackl <hackl@ibi.baug.ethz.ch>
+
+        Parameters
+        ----------
+
+        gdict: OD demands dict
+
+        Returns
+        -------
+        An nx object.
+
+        """
+        t0 = time.process_time()
+        self.TAP = self.build_TAP(self.G, n_iter=600)
+        self.TAP.run_social(fcoeffs=self.fcoeffs, build_t0=False, exogenous_G=exogenous_G)
         runtime = time.process_time() - t0
         self.G = self.TAP.graph
         return runtime, self.TAP.RG
@@ -254,7 +277,7 @@ class tNet():
 
         """
 
-        self.build_TAP(self.G_supergraph)
+        self.TAP = self.build_TAP(self.G_supergraph)
         t0 = time.process_time()
         TT = self.TAP.run_social(fcoeffs=self.fcoeffs, build_t0=build_t0, exogenous_G=exogenous_G)
         runtime = time.process_time() - t0
@@ -279,11 +302,11 @@ class tNet():
         """
         self.TAP = self.build_TAP(self.G_supergraph, n_iter=n_iter)
         t0 = time.process_time()
-        TT, d_norm = self.TAP.run_social_capacity(fcoeffs=self.fcoeffs, build_t0=build_t0, exogenous_G=exogenous_G, d_step=d_step)
+        TT, d_norm, RG = self.TAP.run_social_capacity(fcoeffs=self.fcoeffs, build_t0=build_t0, exogenous_G=exogenous_G, d_step=d_step)
         runtime = time.process_time() - t0
         self.G_supergraph = self.TAP.graph
 
-        return TT[1:], d_norm[1:], runtime
+        return TT[1:], d_norm[1:], runtime, RG
 
     def set_fcoeffs(self, fcoeff):
         """
@@ -453,7 +476,19 @@ class tNet():
                 self.G_supergraph.nodes[n]['pos'] = self.G.nodes[n2]['pos']
 
 
+    def OD_to_tex(self):
 
+        max_s = max([s for s,t in self.g.keys()])
+        max_t = max([t for s,t in self.g.keys()])
+        M = np.zeros((max_t, max_s))
+        for w,d in self.g.items():
+            M[w[0]-1][w[1]-1] = d
+        df = pd.DataFrame(M)
+        df.columns += 1
+        df.index += 1
+        d = df.to_latex(float_format="%.0f",
+                        column_format = 'c|'+'c'*len(df.columns))
+        print(d)
 
 def latlong_to_xy(pos):
     pp = Proj(proj='utm',zone=10,ellps='WGS84', preserve_units=False)
@@ -473,7 +508,7 @@ def plot_network_flows(G, weight='flow', width=3, cmap=plt.cm.Blues):
     return fig, ax
 
 def plot_network(G, ax, edgelist=None, edge_width=0.1,
-	edgecolors='k', nodecolors='k', nodesize=1, arrowstyle='fancy', arrowsize=0.1, edge_alpha=1, linkstyle='-', connectstyle='arc3, rad=0.05', cmap=plt.cm.inferno_r, vmin=0, vmax=1):
+	edgecolors='k', nodecolors='lightgray', nodesize=1, arrowstyle='fancy', arrowsize=0.1, edge_alpha=1, linkstyle='-', connectstyle='arc3, rad=0.05', cmap=plt.cm.inferno_r, vmin=0, vmax=1):
     if edgelist == None:
         edgelist = list(G.edges())
     pos = nx.get_node_attributes(G, 'pos')
@@ -484,13 +519,16 @@ def plot_network(G, ax, edgelist=None, edge_width=0.1,
                 edge_color=edgecolors,
                 node_size=nodesize,
                 node_color=nodecolors,
+                linewidths=8,
                 connectionstyle=connectstyle,
                 #arrowstyle=None,
                 arrowsize=arrowsize,
                 alpha=edge_alpha,
                 style=linkstyle,
                 edge_cmap=cmap,
-                edge_vmin=vmin, edge_vmax=vmax)
+                edge_vmin=vmin,
+            edge_vmax=vmax,
+            with_labels=True)
     #else:
     #    nx.draw(G, pos, width=edge_width,
     #            ax=ax, edge_color=edgecolors,
@@ -928,58 +966,6 @@ def write_flowFile(G, fname):
     write_file(header + text, fname)
 
 
-def solveMSA_julia(tnet, fcoeffs=False, G_exo=False, net_fname="tmp_jl/net.txt", trips_fname="tmp_jl/trips.txt"):
-    """
-    Solve the MSA flows for a traffic network using the MSA module by
-    __ .. __ in Julia
-
-    Parameters
-    ----------
-
-	tnet object
-
-    Returns
-    -------
-    An updated nx object.
-    """
-    if fcoeffs == False:
-        fcoeffs = tnet.fcoeffs
-    # pwd = os.getcwd()
-    # link_id, text_net = writeNetfile(tnet.G, tnet.g, net_fname)
-    # text_trips = writeTripsfile(tnet.g, trips_fname)
-    new_G = ta.assignment(tnet.G, tnet.g, tnet.fcoeffs, G_exo=G_exo, flow=False, method='MSA', accuracy=0.0001,
-                          max_iter=2000)
-    tnet.G = new_G
-
-    return tnet
-
-
-def solveMSA_julia_social(tnet, fcoeffs=False, G_exo=False, net_fname="tmp_jl/net.txt", trips_fname="tmp_jl/trips.txt"):
-    """
-    Solve the MSA flows for a traffic network using the MSA module by
-    __ .. __ in Julia
-
-    Parameters
-    ----------
-
-	tnet object
-
-    Returns
-    -------
-    An updated nx object.
-    """
-    if fcoeffs == False:
-        fcoeffs = tnet.fcoeffs
-    # pwd = os.getcwd()
-    # link_id, text_net = writeNetfile(tnet.G, tnet.g, net_fname)
-    # text_trips = writeTripsfile(tnet.g, trips_fname)
-    new_G = ta.assignment_social(tnet.G, tnet.g, tnet.fcoeffs, G_exo=G_exo, flow=False, method='MSA', accuracy=0.0001,
-                                 max_iter=000)
-    tnet.G = new_G
-
-    return tnet
-
-
 def add_net_flows(array):
     # TODO: add description
 
@@ -1129,3 +1115,14 @@ def get_network_parameters(net_name, experiment_name='_'):
     dir_out = tstamp + "_"+ experiment_name
 
     return netFile, gFile, fcoeffs, tstamp, dir_out
+
+
+def read_net(net_name):
+    if net_name == 'NYC':
+        tNet, tstamp, fcoeffs = nyc.build_NYC_net('data/net/NYC/', only_road=True)
+    else:
+        netFile, gFile, fcoeffs, tstamp, dir_out = get_network_parameters(net_name=net_name,
+                                                                               experiment_name=net_name + '_n_variation')
+        print(netFile)
+        net = tNet(netFile=netFile, gFile=gFile, fcoeffs=fcoeffs)
+    return net, fcoeffs
