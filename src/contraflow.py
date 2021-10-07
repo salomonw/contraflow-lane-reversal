@@ -1,3 +1,4 @@
+import time
 import networkx as nx
 import src.tnet as tnet
 import copy
@@ -5,10 +6,12 @@ import src.CARS as cars
 from multiprocessing import Pool
 import multiprocessing as mp
 from src.utils import *
-import pwlf as pw
+import  pwlf as pw
 from gurobipy import *
 import numpy as np
 import matplotlib.pyplot as plt
+from gurobipy import *
+
 plt.style.use(['science','ieee', 'high-vis'])
 
 def eval_tt_funct(flow, t0, m, fcoeffs):
@@ -316,18 +319,33 @@ def solve_FW(tNet_, step, n_iter):
     #                                                 bush=True)
     obj = tnet.get_totalTravelTime(tNet1.G_supergraph, tNet1.fcoeffs)
     c = {(i,j): tNet1.G_supergraph[i][j]['capacity'] for i,j in tNet1.G_supergraph.edges()}
-    return tNet1, obj, TT, d_norm, RG, c
+    return tNet1, obj, TT, d_norm, RG, c, runtime
+
+def get_obj_pwl(tnet, e, xu, s, theta, a, lambda_cap, QP=False):
+    obj  = 0
+    for i,j in tnet.G_supergraph.edges():
+        t0 = tnet.G_supergraph[i][j]['t_0']
+        m = tnet.G_supergraph[i][j]['capacity']
+        obj += t0 * xu[(i, j)]/m
+        for l in range(len(theta)-1):
+            obj +=  t0*(a[l]/m) * e[(l, i, j)]
+    if QP == False:
+        obj += lambda_cap * quicksum(s[(i, j)] for i, j in tnet.G.edges())
+    else:
+        obj += lambda_cap * quicksum(s[(i, j)] * s[(i, j)] for i, j in tnet.G.edges())
+    return obj
 
 
-
-def solve_alternating(tNet0, g_per, e=1e-2, type_='full', n_lines_CARS=5):
+def solve_alternating(tNet0, e=1e-2, theta=None, a=None, type_='full', n_lines_CARS=5):
     tNet = copy.deepcopy(tNet0)
-    tNet.set_g(g_per)
+    #tNet.set_g(g_per)
     eps = 10000
     k = 0
     objs =[]
-    tNet, runtime, od_flows = cars.solve_bush_CARSn(tNet, fcoeffs=tNet.fcoeffs, n=n_lines_CARS, exogenous_G=False,
-                                                    rebalancing=False, linear=False, bush=True)
+
+    t0 = time.time()
+    tNet, runtime, od_flows, c = cars.solve_bush_CARSn(tNet, fcoeffs=tNet.fcoeffs, n=n_lines_CARS, exogenous_G=False,
+                                                    rebalancing=False, linear=False, bush=True, theta=theta, a=a)
     obj = tnet.get_totalTravelTime(tNet.G_supergraph, tNet.fcoeffs)
     objs.append(obj)
     while eps>e and k<7:
@@ -348,10 +366,11 @@ def solve_alternating(tNet0, g_per, e=1e-2, type_='full', n_lines_CARS=5):
             tNet.G_supergraph[i][j]['t_k'] = cars.travel_time(tNet, i, j)
         obj = tnet.get_totalTravelTime(tNet.G_supergraph, tNet.fcoeffs)
         k+=1
-        tNet, runtime, od_flows = cars.solve_bush_CARSn(tNet, fcoeffs=tNet.fcoeffs, n=8, exogenous_G=False,
-                                                        rebalancing=False, linear=False, bush=True)
+        tNet, runtime, od_flows, c = cars.solve_bush_CARSn(tNet, fcoeffs=tNet.fcoeffs, n=n_lines_CARS, exogenous_G=False,
+                                                        rebalancing=False, linear=False, bush=True, theta=theta, a=a)
         objs.append(obj)
-    return tNet, objs
+    rtime = time.time() - t0
+    return tNet, objs, rtime
 
 
 def project_fluid_sol_to_integer(tNet):

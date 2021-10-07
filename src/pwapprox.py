@@ -143,3 +143,70 @@ class pwapprox:
         ax.plot(self.x, y_hat, color='red')
         for i in self.x_part:
             ax.axvline(i, color='k', linestyle=':')
+
+
+def get_theta(fun):
+    return fun.fit_breaks[1:-1]
+
+def get_beta(fun):
+    return fun.slopes[1:]
+
+
+def eval_travel_time(x, fcoeffs):
+    return sum([fcoeffs[i]*x**(i+1) for i in range(len(fcoeffs))])
+
+
+def eval_pw(a, b, theta, x):
+    theta2 = theta.copy()
+    theta2.append(1000)
+    for i in range(len(theta2)-1):
+        if (theta2[i] <= x) and (theta2[i+1] > x):
+            y = b[i] + a[i]*x
+    return y
+
+def get_approx_fun(fcoeffs, range_=[0,2], nlines=3, plot=2, ax=None):
+    # Generate data
+    x = [i  for i in list(np.linspace(range_[0], range_[1], 100))]
+    y = [eval_travel_time(i, fcoeffs) for i in x]
+    pws = pwapprox(x, y, k=nlines)
+    pws.fit_convex_boyd(N=30, L=30)
+    rms = min(pws.rms_vec)
+    i = pws.rms_vec.index(rms)
+    a = pws.a_list[i]
+    b = pws.b_list[i]
+    theta = pws.thetas[i]
+    theta.insert(0,0)
+    theta.append(range_[1])
+    if plot == 1 :
+        if nlines ==2 :
+            ax.plot(x, y , label = '$t(x)$')#, color='k')
+        ypws = [eval_pw(a,b, theta[0:-1], i) for i in x]
+        p = ax.plot(x, ypws, '-', label='$\hat{t}(x)$, $n=$'+str(nlines))
+        color = p[0].get_color()
+        j=0
+        for th in theta:
+            if th > range_[0] and th< range_[1]:
+                j+=1
+                ax.text(th+0.02, 2.8 ,'$\\theta^{('+str(j)+')}$' ,color=color)
+                ax.axvline(x=th, linestyle=':', color=color)
+        ax.set_xlabel('x')
+        ax.set_ylabel('t(x)')
+        ax.set_xlim((range_[0],range_[1]))
+        plt.legend()
+        plt.tight_layout()
+    if plot == 2:
+        fig, ax = plt.subplots(2)
+        ax[0].plot(x, y , label = 'Original', color='k')
+        ypws = [eval_pw(a,b, theta[0:-1], i) for i in x]
+        ax[0].plot(x, ypws, label='pwlinear', color='red')
+        for th in theta:
+            ax[0].axvline(x=th, linestyle=':')
+        plt.grid()
+        plt.xlabel('$x$')
+        plt.ylabel('$t(x)$')
+        plt.legend()
+        plt.tight_layout()
+        pws.plot_rms(ax=ax[1])
+        plt.show()
+    return  theta, a, rms
+

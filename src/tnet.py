@@ -282,7 +282,6 @@ class tNet():
         TT = self.TAP.run_social(fcoeffs=self.fcoeffs, build_t0=build_t0, exogenous_G=exogenous_G)
         runtime = time.process_time() - t0
         self.G_supergraph = self.TAP.graph
-
         return TT, runtime
 
     def solveMSAsocial_capacity_supergraph(self, build_t0=False, exogenous_G=False, d_step=1, n_iter=200):
