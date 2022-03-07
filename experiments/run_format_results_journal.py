@@ -56,8 +56,9 @@ def plot_alg_comparison(files_dir, out_dir):
     plt.savefig(out_dir + '/FW_iteration_mult' + str(g_mult).replace('.', '_') + '.pdf')
 
 def plot_max_num_reversals(files_dir, out_dir):
-    objs = zload(files_dir + '/objs_num_lanes.pkl')
+    objs = zload(files_dir + '/objs_num_reversals.pkl')
     max_lanes_vec = zload(files_dir + '/max_lanes_vec.pkl')
+    print(objs)
     objs = [i/objs[0] for i in objs]
     fig, ax = plt.subplots(figsize=(4, 2))
     plt.plot(max_lanes_vec, objs, marker='.')
@@ -81,7 +82,7 @@ def table_comparisons(nets, gmultis):
 
 
 if __name__ == "__main__":
-    '''
+    '''  '''
     # PARAMETERS
     net_name = str(sys.argv[1])
     g_mult = float(sys.argv[2])
@@ -95,9 +96,9 @@ if __name__ == "__main__":
     plot_alg_comparison(files_dir, out_dir)
     plot_diff_gs(files_dir, out_dir)
     plot_max_num_reversals(files_dir, out_dir)
-    '''
+
     # Generate table with results
-    nets = ['test_9','EMA_mid']
+    nets = ['test_9', 'EMA_mid']
     gmultis = [1.0, 1.5, 2.0, 3.0]
     table_comparisons(nets, gmultis)
 

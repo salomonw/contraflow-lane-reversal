@@ -19,7 +19,16 @@ def read_net(net_name):
 def more_and_more_links(tNetc, max_lanes_vec, gmult=1, n_lines_CARS=5):
     tNet = deepcopy(tNetc)
     objs = []
-    tNet, runtime, od_flows = cars.solve_bush_CARSn(tNet, fcoeffs=tNet.fcoeffs, n=n_lines_CARS, exogenous_G=False, rebalancing=False,linear=False, bush=True)
+    tNet, runtime, od_flows = cars.solve_bush_CARSn(tNet,
+                                                    fcoeffs=tNet.fcoeffs,
+                                                    n=n_lines_CARS,
+                                                    exogenous_G=False,
+                                                    rebalancing=False,
+                                                    linear=True,
+                                                    integer=True,
+                                                    bush=True,
+                                                    od_flows_flag=False,
+                                                    userCentric=True)
     obj = tnet.get_totalTravelTime(tNet.G_supergraph, tNet.fcoeffs)
     for m in max_lanes_vec:
         betas = {}
@@ -51,7 +60,7 @@ if __name__ == "__main__":
     # Preprocessing
     tNet, max_caps = cflow.integralize_inputs(tNet)
     out_dir = 'tmp/'+net_name+'_'+str(g_mult)
-    n_lines_CARS = 5
+    n_lines_CARS = 8
 
     # SECOND EXPERIMENT (RESTRICT NUMBER OF LINKS)
     tNet0 = deepcopy(tNet)
