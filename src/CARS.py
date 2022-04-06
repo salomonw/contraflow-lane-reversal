@@ -721,6 +721,12 @@ def get_rebalancing_flow(tnet):
 
 def UC_fcoeffs(fcoeffs):
     f = [fcoeffs[i]/(i+1) for i in range(len(fcoeffs))]
+    #f = [fcoeffs[i] + (i+1)*fcoeffs[i+1] for i in range(1, len(fcoeffs)-1)]
+    #f = [(i) * fcoeffs[i] for i in range(1, len(fcoeffs))]
+    f.insert(0, 0)
+    #f.insert(0, fcoeffs[0])
+    #f.append(fcoeffs[-1])
+    print(f)
     return f
 
 def plot_supergraph_car_flows(tnet, weight='flow', width=3, cmap=plt.cm.Blues):

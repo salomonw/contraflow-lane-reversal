@@ -59,7 +59,7 @@ if __name__ == "__main__":
     out_dir = 'tmp/'+net_name+'_'+str(g_mult)
     tNet2 = deepcopy(tNet)
     tNet3 = deepcopy(tNet)
-    n = 8
+    n = 5
 
     # Get piecewise functions
     def get_pwfunction(fcoeffs, n, theta_n, theta=False, userCentric=False):
@@ -87,7 +87,7 @@ if __name__ == "__main__":
         'a': a_SO,
         'exogenous_G': False,
         'rebalancing': False,
-        'linear': True,
+        'linear': False,
         'bush': True,
         'capacity': False,
         'integer': True,
