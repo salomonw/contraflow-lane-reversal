@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="b9025788-bcd1-4b1d-8b88-0fea9f83a669" name="salomonw@scc1.bu.edu" url="">
+        <fileTransfer rootFolder="/usr3/graduate/salomonw/Github/tnet" accessType="SFTP" host="scc1.bu.edu" port="22" sshConfigId="541cc3a4-7c26-4936-90fd-6c25993692ac" sshConfig="salomonw@scc1.bu.edu:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
