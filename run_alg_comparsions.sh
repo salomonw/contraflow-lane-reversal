@@ -11,10 +11,11 @@
 module load gurobi
 
 # Define Network
-nets="test_9 EMA EMA_mid Anaheim NYC"
+#nets="test_9 EMA EMA_mid Anaheim NYC"
+nets="test_9 EMA_mid"
 #nets="NYC"
 # Define Demand multiplier
-g_mult="3"
+g_mult="2"
 
 for net in $nets; do
     # Run programs

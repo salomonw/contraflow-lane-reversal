@@ -308,7 +308,6 @@ class tNet():
         TT, d_norm, RG = self.TAP.run_social_capacity(fcoeffs=self.fcoeffs, build_t0=build_t0, exogenous_G=exogenous_G, d_step=d_step)
         runtime = time.process_time() - t0
         self.G_supergraph = self.TAP.graph
-
         return TT[1:], d_norm[1:], runtime, RG
 
     def set_fcoeffs(self, fcoeff):

@@ -409,7 +409,7 @@ class TrafficAssignment(object):
         return TT
 
     def run_social_capacity(self, fcoeffs=[1, 0, 0, 0, 0.15, 0], build_t0=False, exogenous_G=False, d_step='FW'):
-        pool = mp.Pool(100)
+        pool = mp.Pool(20)
         TT = []
         d_norm = []
         RG = []
@@ -557,9 +557,9 @@ class TrafficAssignment(object):
             return l
 
     def update_capacity(self, d, d_step=9e-2, t=1):
-        #d_step = 9e-2
-        d_step = self.bisection_capacity(d)
-        #d_step = d_step/t
+        d_step = 30
+        #d_step = self.bisection_capacity(d)
+        d_step = d_step/t
         gamma0 = {(i, j): d_step for i, j in self.graph.edges()}
         gamma = gamma0
         V = []
@@ -664,19 +664,14 @@ class TrafficAssignment(object):
 
 
 def get_derivative_ij(args):
-
     xij, xji, t0ij, t0ji, cij, cji, zij, zji, n, fcoeffs, delta = args
-
-    v = sum(i * fcoeffs[i] * (
-        (t0ji * (xji/(cji)) ** (i + 1) )# * cji ** (-i))
-            - (t0ij * (xij/(cij)) ** (i + 1) ))#* cij ** (-i)))
-            for i in range(len(fcoeffs)))
-    #t0 = eval_tt_funct(xij, t0ij, mij, fcoeffs)
-    #tinv0 = eval_tt_funct(xji, t0ji, mji, fcoeffs)
-    #mij += delta
-    #mji -= delta
-    #t = eval_tt_funct(xij, t0ij, mij, fcoeffs)
-    #tinv = eval_tt_funct(xji, t0ji, mji, fcoeffs)
+    v = sum(i * fcoeffs[i] * ((t0ji * (xji/(cji)) ** (i + 1) ) - (t0ij * (xij/(cij)) ** (i + 1) )) for i in range(len(fcoeffs)))
+    #t0 = eval_tt_funct(xij, t0ij, cij, fcoeffs)
+    #tinv0 = eval_tt_funct(xji, t0ji, cji, fcoeffs)
+    #cij += delta
+    #cji -= delta
+    #t = eval_tt_funct(xij, t0ij, cij, fcoeffs)
+    #tinv = eval_tt_funct(xji, t0ji, cji, fcoeffs)
     #v = ((t + tinv) - (t0 + tinv0)) / (delta)
     return v
 

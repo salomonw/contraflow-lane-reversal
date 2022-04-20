@@ -72,6 +72,7 @@ def solve_and_get_stats(tNet, theta, a):
 
 if __name__ == "__main__":
     nets = ['test_9', 'EMA', 'SiouxFalls', 'EMA_mid', 'Anaheim', 'NYC']
+    nets = ['test_9', 'EMA', 'SiouxFalls', 'EMA_mid', 'Anaheim']
     cols = ['Network', 'Model', 'Time', 'Objective', 'Num. Lanes', 'L', 'Integer Vars.', 'Continuous Vars.', 'Num. Constraints']
     df = pd.DataFrame()
     for net_name in nets:
@@ -86,10 +87,9 @@ if __name__ == "__main__":
         # Preprocessing
         tNet, max_caps = cflow.integralize_inputs(tNet)
 
-        for l in range(3, 7):
+        for l in [3, 5, 7]:
             # find different granularities
             theta, a = get_pwfunction(fcoeffs, n=l, theta_n=3, theta=False, userCentric=False)
             result = solve_and_get_stats(tNet, theta, a)
             df = df.append(pd.DataFrame(result, columns=cols), ignore_index=True)
-            print(df)
-
+    df.to_csv('different_net_sizes_exp.csv')

@@ -25,6 +25,8 @@ def get_derivative_ij(args):
     tinv = eval_tt_funct(xji, t0ji, mji, fcoeffs)
     v = ((t + tinv) - (t0 + tinv0)) / (delta)
     return v
+
+
 @timeit
 def get_derivative(G, fcoeffs, delta, pool):
     # Find derivatives
@@ -296,73 +298,54 @@ def solve_opt_int_pwl(tNet, betas, breaks, max_lanes=None, max_links=None):
 
 def solve_FW(tNet_, step, n_iter):
     tNet1 = copy.deepcopy(tNet_)
-    #TT, d_norm, runtime = tNet1.solveMSA(exogenous_G=False)
     TT, d_norm, runtime, RG = tNet1.solveMSAsocial_capacity_supergraph(build_t0=False,
                                                                        exogenous_G=False,
                                                                        d_step=step,
                                                                        n_iter=n_iter)
-    #TT, d_norm, runtime = tNet1.solveMSAsocial_supergraph(build_t0=False, exogenous_G=False)
-    #ax[0].plot(list(range(len(TT))), TT, label='step='+str(step), alpha=0.7)
-    #ax[1].plot(list(range(len(TT))), d_norm, label='step=' + str(step), alpha=0.7)
-    #ax[2].plot(list(range(len(RG))), RG, label='step=' + str(step), alpha=0.7)
-
-    tNet1 = project_fluid_sol_to_integer(tNet1)
-
-    #tNet1, runtime, od_flows, _ = cars.solve_bush_CARSn(tNet1,
-    #                                                 fcoeffs=tNet1.fcoeffs,
-    #                                                 n=9,
-    #                                                 exogenous_G=False,
-    #                                                 rebalancing=False,
-    #                                                 linear=False,
-    #                                                 bush=True)
-    obj = tnet.get_totalTravelTime(tNet1.G_supergraph, tNet1.fcoeffs)
+    #tNet1 = project_fluid_sol_to_integer(tNet1)
+    #obj = tnet.get_totalTravelTime(tNet1.G_supergraph, tNet1.fcoeffs)
+    obj = 1
     c = {(i,j): tNet1.G_supergraph[i][j]['capacity'] for i, j in tNet1.G_supergraph.edges()}
     return tNet1, obj, TT, d_norm, RG, c, runtime
 
 
-
-def solve_alternating(tNet0, g_per, e=1e-2, type_='full', n_lines_CARS=5):
+def solve_alternating(tNet0, e=1e-2, theta=None, a=None, type_='full', n_lines_CARS=5):
     tNet = copy.deepcopy(tNet0)
-    tNet.set_g(g_per)
     eps = 10000
     k = 0
-    objs = []
-    params = {
-        'fcoeffs': tNet.fcoeffs,
-        'n': n_lines_CARS,
-        'exogenous_G': False,
-        'rebalancing': False,
-        'linear': False,
-        'bush': True
-    }
-    tNet, runtime, od_flows, _ = cars.solve_bush_CARSn(tNet,**params)
+    objs =[]
+
+    t0 = time.time()
+    tNet, runtime, od_flows, c = cars.solve_bush_CARSn(tNet, fcoeffs=tNet.fcoeffs, n=n_lines_CARS, exogenous_G=False,
+                                                    rebalancing=False, linear=False, bush=True, theta=theta, a=a,
+                                                       capacity=False)
     obj = tnet.get_totalTravelTime(tNet.G_supergraph, tNet.fcoeffs)
     objs.append(obj)
-
-    start_time = time.time()
-    while eps > e and k < 7:
+    while eps>e and k<7:
         betas = {}
         breaks = {}
         for i, j in tNet.G_supergraph.edges():
             beta0, beta1, breaks0 = get_arc_pwfunc(tNet, i, j)
             betas[(i, j)] = {'beta0': beta0, 'beta1': beta1}
             breaks[(i, j)] = breaks0
-        if type_ == 'one by one':
+        if type_== 'one by one':
             sol = solve_opt_int_pwl(tNet, betas=betas, breaks=breaks, max_lanes=1)
-        elif type_ == 'full':
-            sol = solve_opt_int_pwl(tNet, betas=betas, breaks=breaks, max_lanes=len(tNet.G_supergraph.edges()))
+        elif type_== 'full':
+            sol = solve_opt_int_pwl(tNet, betas=betas, breaks=breaks, max_lanes=len(tNet.G_supergraph.edges())*10)
         else:
             sol = solve_opt_int_pwl(tNet, betas=betas, breaks=breaks, max_lanes=type_)
         for i, j in tNet.G.edges():
             tNet.G_supergraph[i][j]['capacity'] = sol[(i, j)] * 1500
             tNet.G_supergraph[i][j]['t_k'] = cars.travel_time(tNet, i, j)
+        k+=1
+        tNet, runtime, od_flows, c = cars.solve_bush_CARSn(tNet, fcoeffs=tNet.fcoeffs, n=n_lines_CARS, exogenous_G=False,
+                                                        rebalancing=False, linear=False, bush=True, theta=theta, a=a,
+                                                        capacity=False)
         obj = tnet.get_totalTravelTime(tNet.G_supergraph, tNet.fcoeffs)
-        k += 1
-        tNet, runtime, od_flows, _ = cars.solve_bush_CARSn(tNet, fcoeffs=tNet.fcoeffs, n=8, exogenous_G=False,
-                                                        rebalancing=False, linear=False, bush=True)
         objs.append(obj)
-    runtime = time.time() - start_time
-    return tNet, objs, runtime
+    rtime = time.time() - t0
+    return tNet, objs, rtime
+
 
 
 def project_fluid_sol_to_integer(tNet):
