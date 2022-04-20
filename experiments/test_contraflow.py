@@ -477,15 +477,24 @@ def solve_alternating(tNet0, g_per, e=1e-2, type_='full', n_lines_CARS=5):
 def solve_FW(tNet_, step, ax, n_iter):
     tNet1 = copy.deepcopy(tNet_)
     #TT, d_norm, runtime = tNet1.solveMSA(exogenous_G=False)
-    TT, d_norm, runtime = tNet1.solveMSAsocial_capacity_supergraph(build_t0=False, exogenous_G=False, d_step=step, n_iter = n_iter)
+    TT, d_norm, runtime, RG = tNet1.solveMSAsocial_capacity_supergraph(build_t0=False,
+                                                                   exogenous_G=False,
+                                                                   d_step=step,
+                                                                   n_iter=n_iter)
     #TT, d_norm, runtime = tNet1.solveMSAsocial_supergraph(build_t0=False, exogenous_G=False)
     ax[0].plot(list(range(len(TT))), TT, label='step='+str(step))
     ax[1].plot(list(range(len(TT))), d_norm, label='step=' + str(step))
 
     tNet1 = project_fluid_sol_to_integer(tNet1)
 
-    tNet1, runtime, od_flows = cars.solve_bush_CARSn(tNet1, fcoeffs=tNet1.fcoeffs, n=9, exogenous_G=False,
-                                                    rebalancing=False, linear=False, bush=True)
+    tNet1, runtime, od_flows = cars.solve_bush_CARSn(tNet1,
+                                                     fcoeffs=tNet1.fcoeffs,
+                                                     n=9,
+                                                     exogenous_G=False,
+                                                     rebalancing=False,
+                                                     linear=False,
+                                                     bush=True,
+                                                     od_flows_flag=False)
     obj = get_obj(tNet1.G_supergraph, tNet1.fcoeffs)
     return tNet1, obj, TT, d_norm
 
@@ -683,7 +692,7 @@ if exps[3] == 1:
         objs[g_mult] = []
         objs_labels = ['Nominal']
         tNet, runtime, od_flows = cars.solve_bush_CARSn(tNet, fcoeffs=tNet.fcoeffs, n=n_lines_CARS, exogenous_G=False,
-                                                        rebalancing=False, linear=False, bush=True)
+                                                        rebalancing=False, linear=False, bush=True, od_flows_flag=False)
         #print(min([tNet.G_supergraph[i][j]['max_capacity'] for i, j in tNet.G_supergraph.edges()]))
         obj = get_obj(tNet.G_supergraph, tNet.fcoeffs)
         objs[g_mult].append(obj)

@@ -40,7 +40,7 @@ if __name__ == "__main__":
     out_dir = 'tmp/'+net_name+'_'+str(g_mult)
     tNet2 = deepcopy(tNet)
     tNet3 = deepcopy(tNet)
-    n = 7
+    n = 9
 
     theta, a, rms = cars.get_approx_fun(fcoeffs=tNet.fcoeffs, nlines=n, range_=[0, 3], plot=False)
 
@@ -58,23 +58,40 @@ if __name__ == "__main__":
     }
 
     tNet, runtime, od_flows, c = cars.solve_bush_CARSn(tNet, **params)
-
-    obj = tnet.get_totalTravelTime(tNet.G_supergraph, tNet.fcoeffs)
+    obj = eval_obj(tNet, params)
     print(obj)
 
-    L = np.logspace(0.01,10, num=10)
-    for l in L:
-        tNet3 = deepcopy(tNet2)
-        params['lambda_cap'] = l
-        params['capacity'] = True
-        tNet3, runtime, od_flows, c = cars.solve_bush_CARSn(tNet3, **params)
-        for i, j in tNet.G_supergraph.edges():
-            tNet3.G_supergraph[i][j]['capacity'] = c[(i, j)]
+    L = np.logspace(0.01, 10, num=10)
+    methods = ['MIQP', 'QP', 'MILP', 'LP']
+    results = {}
+    cnt = 0
+    for method in methods:
+        for l in L:
+            tNet3 = deepcopy(tNet2)
+            params['lambda_cap'] = l
+            params['capacity'] = True
+            if 'MIQP':
+                params['integer'] = True
+                params['linear'] = False
+            if 'MILP':
+                params['integer'] = True
+                params['linear'] = True
+            if 'QP':
+                params['integer'] = False
+                params['linear'] = False
+            if 'LP':
+                params['integer'] = False
+                params['linear'] = True
 
-        tNet3, _ = cflow.integralize_inputs(tNet3)
-        obj = eval_obj(tNet3, params)
-        print('Lambda: {}; \t Obj: {}'.format(l, obj))
+            tNet3, runtime, od_flows, c = cars.solve_bush_CARSn(tNet3, **params)
+            for i, j in tNet.G_supergraph.edges():
+                tNet3.G_supergraph[i][j]['capacity'] = c[(i, j)]
 
-    #tNet3, obj, TT, dnorm, RG, c = cflow.solve_FW(tNet3, 'FW', n_iter=1000)
-    #obj = eval_obj(tNet3, c)
-    #print(obj)
+            tNet3, _ = cflow.integralize_inputs(tNet3)
+            obji = eval_obj(tNet3, params)
+            #print('Lambda: {}; \t Obj: {}'.format(l, obj))
+            results[cnt] = {'method': method, 'lambda': l, 'obj': obji/obj}
+            #print(results)
+            cnt += 1
+
+    zdump(results, out_dir + '/lambda.pkl')

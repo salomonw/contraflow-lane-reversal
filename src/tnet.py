@@ -78,7 +78,10 @@ class tNet():
         assert (self.totalDemand > 0), "Total demand is zero!!"
         assert (self.nNodes > 0), "No nodes in graph!!"
         assert (self.nLinks > 0), "No links in graph!!"
-        TAP = msa.TrafficAssignment(G, self.gGraph, fcoeffs=self.fcoeffs, iterations=n_iter)
+        TAP = msa.TrafficAssignment(G, self.gGraph,
+                                    fcoeffs=self.fcoeffs,
+                                    iterations=n_iter,
+                                    threshold=0.0025)
         return TAP
 
     def build_pedestrian_net(self):
@@ -1052,6 +1055,10 @@ def get_network_parameters(net_name, experiment_name='_'):
         netFile = "data/net/Braess1_net.txt"
         gFile = "data/trips/Braess1_trips.txt"
         fcoeffs = [1, 1, 0, 0, 0., 0]
+    elif net_name == 'Braess2':
+        netFile = "data/net/Braess2_net.txt"
+        gFile = "data/trips/Braess2_trips.txt"
+        fcoeffs = [1, 1, 0.001, 0., 0., 0.]
     elif net_name == 'EMA':
         netFile = "data/net/EMA_net.txt"
         gFile = "data/trips/EMA_trips.txt"

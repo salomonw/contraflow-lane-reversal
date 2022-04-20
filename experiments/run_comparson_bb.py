@@ -35,7 +35,7 @@ if __name__ == "__main__":
     tNet, max_caps = cflow.integralize_inputs(tNet)
     out_dir = 'results/'+net_name+'_'+str(g_mult)
     tmp_dir = 'tmp/'+net_name+'_'+str(g_mult)
-    n_lines_CARS = 5
+    n_lines_CARS = 9
 
 
 
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     objs[g_mult] = []
     objs_labels = ['Nominal']
     tNet, runtime, od_flows = cars.solve_bush_CARSn(tNet, fcoeffs=tNet.fcoeffs, n=n_lines_CARS, exogenous_G=False,
-                                                    rebalancing=False, linear=False, bush=True)
+                                                    rebalancing=False, linear=False, bush=True, od_flows_flag=False)
     # print(min([tNet.G_supergraph[i][j]['max_capacity'] for i, j in tNet.G_supergraph.edges()]))
     obj = tnet.get_totalTravelTime(tNet.G_supergraph, tNet.fcoeffs)
     objs[g_mult].append(obj)
@@ -64,7 +64,7 @@ if __name__ == "__main__":
         breaks[(i, j)] = breaks0
 
     t = datetime.now()
-    sol = cflow.solve_opt_int_pwl(tNet, betas=betas, breaks=breaks, max_lanes=len(tNet.G_supergraph.edges()))
+    sol = cflow.solve_opt_int_pwl(tNet, betas=betas, breaks=breaks, max_lanes=len(tNet.G_supergraph.edges()), binary=False)
     t = datetime.now() - t
     obj = tnet.get_totalTravelTime(tNet.G_supergraph, tNet.fcoeffs)
     print('Linear   \t Obj: {} \t Time= {}'.format(obj,t))

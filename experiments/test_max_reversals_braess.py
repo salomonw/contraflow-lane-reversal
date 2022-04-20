@@ -24,21 +24,25 @@ def eval_obj(tNet2, params):
     params['max_reversals'] = 0
     params['lambda_cap'] = 0
     #print(params)
-    tNet, runtime, _ = cars.solve_bush_CARSn(tNet, **params)
+    #print({(i, j): tNet.G_supergraph[i][j]['capacity'] for i, j in tNet.G_supergraph.edges()})
+    tNet, runtime, _ = cars.solve_bush_CARSn_braess(tNet, **params)
     #print({(i,j): tNet.G_supergraph[i][j]['flow'] for i, j in tNet.G_supergraph.edges()})
+    #print(params['userCentric'])
+    if params['userCentric'] == True:
+        print({(i, j): tNet.G_supergraph[i][j]['lanes'] for i, j in tNet.G_supergraph.edges()})
     obj = tnet.get_totalTravelTime(tNet.G_supergraph, tNet.fcoeffs)
     return obj
 
 
 def more_and_more(l, tNet3, params):
     #tNet3 = deepcopy(tNet2)
-    params['lambda_cap'] = 2
+    params['lambda_cap'] = 1000
     params['max_reversals'] = l
     params['capacity'] = True
-    tNet3, runtime, c = cars.solve_bush_CARSn(tNet3, **params)
+    tNet3, runtime, c = cars.solve_bush_CARSn_braess(tNet3, **params)
     for i, j in tNet.G_supergraph.edges():
-        tNet3.G_supergraph[i][j]['capacity'] = c[(i, j)]
-    tNet3, _ = cflow.integralize_inputs(tNet3)
+        tNet3.G_supergraph[i][j]['capacity'] = c[(i, j)] + 1
+    tNet3, _ = cflow.integralize_inputs_braess(tNet3)
     #print(c)
     return tNet3
 
@@ -56,7 +60,7 @@ if __name__ == "__main__":
     g_per = tnet.perturbDemandConstant(tNet.g, g_mult)
     tNet.set_g(g_per)
     # Preprocessing
-    tNet, max_caps = cflow.integralize_inputs(tNet)
+    tNet, max_caps = cflow.integralize_inputs_braess(tNet)
     out_dir = 'tmp/'+net_name+'_'+str(g_mult)
     #n = 3
 
@@ -72,9 +76,12 @@ if __name__ == "__main__":
         return theta, a
 
 
-    theta_SO, a_SO = get_pwfunction(fcoeffs, n=9, theta_n=3, theta=False, userCentric=False)
-    theta_UC, a_UC = get_pwfunction(fcoeffs, n=9, theta_n=3, theta=False, userCentric=True)
+    theta_SO, a_SO = get_pwfunction(fcoeffs, n=5, theta_n=40, theta=False, userCentric=False)
+    theta_UC, a_UC = get_pwfunction(fcoeffs, n=5, theta_n=40, theta=False, userCentric=True)
 
+    #print(a_SO)
+    #print(a_UC)
+    #asd
     obj = {}
     for userCent in [False, True, 'mix']:
         obj[userCent] = []
@@ -93,7 +100,8 @@ if __name__ == "__main__":
         'lambda_cap': 0,
         'od_flows_flag': False,
         'userCentric': False,
-        'max_reversals': 0
+        'max_reversals': 0,
+        'Theta_Cap': 1
     }
 
     tNet2 = deepcopy(tNet)
@@ -112,7 +120,7 @@ if __name__ == "__main__":
 
 
 
-    L = [i for i in range(30)]
+    L = [i for i in range(4)]
     print('i \t UC(Z_UC) \t UC(Z_SO) \t SO(Z_SO)')
     for l in L:
         for userCent in [False, True]:
@@ -149,5 +157,5 @@ if __name__ == "__main__":
                                       obj[False][-1] / obj0
                                             ))
     mkdir_n(out_dir)
-    zdump(obj, out_dir + '/objs_num_reversals.pkl')
+    zdump(objs, out_dir + '/objs_num_reversals.pkl')
     zdump(L, out_dir + '/max_reversals_vec.pkl')

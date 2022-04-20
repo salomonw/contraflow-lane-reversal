@@ -3,7 +3,7 @@ import pandas as pd
 from src.utils import *
 from src.utils import *
 from os import listdir
-plt.style.use(['science','ieee', 'high-vis'])
+plt.style.use(['science', 'ieee', 'high-vis'])
 
 
 def plot_diff_gs(files_dir, out_dir):
@@ -25,33 +25,36 @@ def plot_diff_gs(files_dir, out_dir):
 
 
 def plot_alg_comparison(files_dir, out_dir):
-    fig, ax = plt.subplots(3, sharex=True, figsize=(4, 6))
+    fig, ax = plt.subplots(3, sharex=True, figsize=(3, 3))
     files = listdir(files_dir)
     steps = []
     for file in files:
-        if 'step' in file:
+        if 'step' and 'FW' in file:
             steps.append(file.split('_')[1])
     for step in set(steps):
         TT = zload(files_dir + '/step_' + str(step) + '_TT_' + str(g_mult) + '.pkl')
         dnorm = zload(files_dir + '/step_' + str(step) + '_dnorm_' + str(g_mult) + '.pkl')
         RG = zload(files_dir + '/step_' + str(step) + '_RG_' + str(g_mult) + '.pkl')
-        ax[0].plot(list(range(len(TT))), TT, ls='-', label='step='+str(step), alpha=0.7)
-        ax[1].plot(list(range(len(TT))), dnorm, ls='-', label='step=' + str(step), alpha=0.7)
-        ax[2].plot(list(range(len(RG))), RG, ls='-', label='step=' + str(step), alpha=0.7)
+        ax[0].plot(list(range(len(TT))), TT, ls='-', label='step='+str(step), alpha=1)
+        ax[1].plot(list(range(len(TT))), dnorm, ls='-', label='step=' + str(step), alpha=1)
+        ax[2].plot(list(range(len(RG))), RG, ls='-', label='step=' + str(step), alpha=1)
         ax[0].set_xlim((0, len(RG)))
-    plt.legend()
+    #plt.legend()
     ax[1].set_xlim((0, len(RG)))
     ax[2].set_xlim((0, len(RG)))
-    ax[0].set_xlabel('Iteration')
-    ax[0].set_ylabel('Objective')
+    #ax[0].set_xlabel('Iteration')
+    ax[0].set_ylabel('$J(\mathbf{x}, \mathbf{z})$')
     ax[0].set_yscale('log')
     ax[0].set_yscale('log')
-    ax[1].set_xlabel('Iteration')
-    ax[1].set_ylabel('Derivative norm')
+    ax[0].grid()
+    #ax[1].set_xlabel('Iteration')
+    ax[1].set_ylabel('$\| \\nabla J^{z}(\mathbf{z}) \|_2$')
     ax[1].set_yscale('log')
+    ax[1].grid()
     ax[2].set_xlabel('Iteration')
-    ax[2].set_ylabel('Relative Gap')
+    ax[2].set_ylabel('RG')
     ax[2].set_yscale('log')
+    ax[2].grid()
     plt.tight_layout()
     plt.savefig(out_dir + '/FW_iteration_mult' + str(g_mult).replace('.', '_') + '.pdf')
 
@@ -62,11 +65,30 @@ def plot_max_num_reversals(files_dir, out_dir):
     objs = [i/objs[0] for i in objs]
     fig, ax = plt.subplots(figsize=(4, 2))
     plt.plot(max_lanes_vec, objs, marker='.')
-    plt.xlabel('Max. number of reversals, $k$')
-    plt.ylabel('$J^{\\text{LP}}_k/J^{\\text{Original}}$')
+    plt.xlabel('Max. Reversals')
+    plt.ylabel('Obj/Nominal (\%)')
     plt.xlim([0, max(max_lanes_vec)])
     plt.tight_layout()
     plt.savefig(out_dir+'/sparse_LA.pdf')
+
+
+def plot_lambda(files_dir, out_dir):
+    results = zload(files_dir + '/lambda.pkl')
+    df = pd.DataFrame(results).T
+    fig, ax = plt.subplots(figsize=(4, 2))
+    for method in df.method.unique():
+        df1 = df[df['method'] == method]
+        x = df1['lambda']
+        y = df1['obj']
+        ax.plot(x, y, label=method)
+    ax.set_xscale('log')
+    ax.set_xlim(min(x), max(x))
+    ax.grid()
+    plt.legend()
+    plt.xlabel('$\lambda$')
+    plt.ylabel('Obj/Nominal(\%)')
+    plt.tight_layout()
+    plt.savefig(out_dir+'/lambdas.pdf')
 
 def table_comparisons(nets, gmultis):
     out_dir = 'results/'
@@ -94,13 +116,13 @@ if __name__ == "__main__":
     mkdir_n(out_dir)
     # generate results
     plot_alg_comparison(files_dir, out_dir)
-    plot_diff_gs(files_dir, out_dir)
+    #plot_diff_gs(files_dir, out_dir)
     plot_max_num_reversals(files_dir, out_dir)
-
+    plot_lambda(files_dir, out_dir)
     # Generate table with results
-    nets = ['test_9', 'EMA_mid']
-    gmultis = [1.0, 1.5, 2.0, 3.0]
-    table_comparisons(nets, gmultis)
+    #nets = ['test_9', 'EMA_mid']
+    #gmultis = [1.0, 1.5, 2.0, 3.0]
+    #table_comparisons(nets, gmultis)
 
 
 

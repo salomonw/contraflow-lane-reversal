@@ -19,7 +19,7 @@ def read_net(net_name):
 def more_and_more_links(tNetc, max_lanes_vec, gmult=1, n_lines_CARS=5):
     tNet = deepcopy(tNetc)
     objs = []
-    tNet, runtime, od_flows = cars.solve_bush_CARSn(tNet, fcoeffs=tNet.fcoeffs, n=n_lines_CARS, exogenous_G=False, rebalancing=False,linear=False, bush=True)
+    tNet, runtime, od_flows, _ = cars.solve_bush_CARSn(tNet, fcoeffs=tNet.fcoeffs, n=n_lines_CARS, exogenous_G=False, rebalancing=False,linear=False, bush=True)
     obj = tnet.get_totalTravelTime(tNet.G_supergraph, tNet.fcoeffs)
     for m in max_lanes_vec:
         betas = {}

@@ -21,7 +21,7 @@ def read_net(net_name):
 def more_and_more_lanes(tNetc, max_lanes_vec, gmult=1, n_lines_CARS=5):
     tNet = deepcopy(tNetc)
     objs = []
-    tNet, runtime, od_flows = cars.solve_bush_CARSn(tNet, fcoeffs=tNet.fcoeffs, n=n_lines_CARS, exogenous_G=False, rebalancing=False,linear=False, bush=True)
+    tNet, runtime, od_flows, _ = cars.solve_bush_CARSn(tNet, fcoeffs=tNet.fcoeffs, n=n_lines_CARS, exogenous_G=False, rebalancing=False,linear=False, bush=True)
     obj = tnet.get_totalTravelTime(tNet.G_supergraph, tNet.fcoeffs)
     for m in max_lanes_vec:
         betas = {}
@@ -58,9 +58,9 @@ if __name__ == "__main__":
 
 
     tNet0 = copy.deepcopy(tNet)
-    tNet0, runtime, od_flows = cars.solve_bush_CARSn(tNet0, fcoeffs=tNet.fcoeffs, n=n_lines_CARS, exogenous_G=False,
+    tNet0, runtime, od_flows, _ = cars.solve_bush_CARSn(tNet0, fcoeffs=tNet.fcoeffs, n=n_lines_CARS, exogenous_G=False,
                                                      rebalancing=False, linear=False, bush=True)
-    max_lanes_vec = [30]
+    max_lanes_vec = [i for i in range(30)]
     tt_org = {}
     tt_new = {}
     tt_imp = {}

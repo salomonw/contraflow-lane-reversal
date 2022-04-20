@@ -215,7 +215,7 @@ class TrafficAssignment(object):
         if self.RG <= self.threshold:
             return True
         else:
-            return  False
+            return False
 
     def check_network_connections(self):
         graph = self.graph.copy()
@@ -464,8 +464,7 @@ class TrafficAssignment(object):
             #tt = self.calculate_traveltime(fcoeffs=fcoeffs, exogenous_G=exogenous_G)
             #tt = self.calculate_total_travel_time() #sum([get_travel_time(x, m, t0,  fcoeffs, exo=0) for ])#self.TT
             tt = get_obj(self.graph, self.fcoeffs)
-            #print('i: {}\tRG:{}\tdnorm: {}\tTT: {}\ta_1: {}\ta_2: {}\t'.format(
-            #    i-1, self.RG, dnorm, tt, alpha_1, phi))
+            #print('i: {}\tRG:{}\tdnorm: {}\tTT: {}\ta_1: {}\ta_2: {}\t'.format(i-1, self.RG, dnorm, tt, alpha_1, phi))
             TT.append(tt)
             RG.append(self.RG)
         pool.close()
@@ -473,8 +472,13 @@ class TrafficAssignment(object):
 
     def get_capacity_derivative(self, delta=1e-1, pool=False):
         d = {}
-        args = [(self.graph[i][j]['flow'], self.graph[j][i]['flow'], self.graph[i][j]['t_0'], self.graph[j][i]['t_0'], self.graph[i][j]['capacity'],
-                 self.graph[j][i]['capacity'], self.fcoeffs, delta) for i, j in self.graph.edges()]
+        #xij, xji, t0ij, t0ji, cij, cji, zij, zji, n, fcoeffs, delta
+        args = [(self.graph[i][j]['flow'], self.graph[j][i]['flow'],
+                 self.graph[i][j]['t_0'], self.graph[j][i]['t_0'],
+                 self.graph[i][j]['capacity'], self.graph[j][i]['capacity'],
+                 #1500, 1500,
+                 self.graph[i][j]['lanes'], self.graph[j][i]['lanes'],
+                 self.graph[j][i]['max_lanes'], self.fcoeffs, delta) for i, j in self.graph.edges()]
         results = pool.map(get_derivative_ij, args)
         # print(results)
         k = 0
@@ -573,6 +577,8 @@ class TrafficAssignment(object):
                 else:
                     self.graph[i][j]['capacity'] -= v
                     self.graph[j][i]['capacity'] += v
+                #self.graph[i][j]['lanes'] = self.graph[i][j]['capacity']/m
+                #self.graph[j][i]['lanes'] = self.graph[j][i]['capacity']/m
                 V.append((j, i))
             #gamma[(i, j)] = gamma0[(i, j)] / k[(i, j)] #*np.exp(-decay*k[(i,j)]/10)  #/(k[(i,j)]**(1/4))
             #k[(j, i)] += 1
@@ -658,14 +664,20 @@ class TrafficAssignment(object):
 
 
 def get_derivative_ij(args):
-    xij, xji, t0ij, t0ji, mij, mji, fcoeffs, delta = args
-    t0 = eval_tt_funct(xij, t0ij, mij, fcoeffs)
-    tinv0 = eval_tt_funct(xji, t0ji, mji, fcoeffs)
-    mij += delta
-    mji -= delta
-    t = eval_tt_funct(xij, t0ij, mij, fcoeffs)
-    tinv = eval_tt_funct(xji, t0ji, mji, fcoeffs)
-    v = ((t + tinv) - (t0 + tinv0)) / (delta)
+
+    xij, xji, t0ij, t0ji, cij, cji, zij, zji, n, fcoeffs, delta = args
+
+    v = sum(i * fcoeffs[i] * (
+        (t0ji * (xji/(cji)) ** (i + 1) )# * cji ** (-i))
+            - (t0ij * (xij/(cij)) ** (i + 1) ))#* cij ** (-i)))
+            for i in range(len(fcoeffs)))
+    #t0 = eval_tt_funct(xij, t0ij, mij, fcoeffs)
+    #tinv0 = eval_tt_funct(xji, t0ji, mji, fcoeffs)
+    #mij += delta
+    #mji -= delta
+    #t = eval_tt_funct(xij, t0ij, mij, fcoeffs)
+    #tinv = eval_tt_funct(xji, t0ji, mji, fcoeffs)
+    #v = ((t + tinv) - (t0 + tinv0)) / (delta)
     return v
 
 def get_obj(G, fcoeffs):

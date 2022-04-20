@@ -16,6 +16,18 @@ def read_net(net_name):
         net = tnet.tNet(netFile=netFile, gFile=gFile, fcoeffs=fcoeffs)
     return net, fcoeffs
 
+def eval_obj(tNet2, params):
+    tNet = deepcopy(tNet2)
+    params['capacity'] = False
+    params['max_reversals'] = 0
+    params['lambda_cap'] = 0
+    #print(params)
+    tNet, runtime, _ = cars.solve_bush_CARSn(tNet, **params)
+    #print({(i,j): tNet.G_supergraph[i][j]['flow'] for i, j in tNet.G_supergraph.edges()})
+    obj = tnet.get_totalTravelTime(tNet.G_supergraph, tNet.fcoeffs)
+    return obj
+
+
 def more_and_more_links(tNetc, max_lanes_vec, gmult=1, n_lines_CARS=5):
     tNet = deepcopy(tNetc)
     objs = []
@@ -41,6 +53,8 @@ def more_and_more_links(tNetc, max_lanes_vec, gmult=1, n_lines_CARS=5):
         for i, j in tNet.G.edges():
             tNet.G_supergraph[i][j]['capacity'] = sol[(i, j)] * 1500
             tNetc.G_supergraph[i][j]['t_k'] = cars.travel_time(tNet, i, j)
+
+
         obj = tnet.get_totalTravelTime(tNet.G_supergraph, tNet.fcoeffs)
         print('max links changes: ' + str(m)+', obj: ' + str(obj))
         objs.append(obj)
