@@ -430,7 +430,7 @@ class TrafficAssignment(object):
         self.RG = 99
         d_step_flag = d_step
         for i in range(1, self.n_iter_tm):
-            d, b = self.get_capacity_derivative(delta=0.1, pool=pool)
+            d, b = self.get_capacity_derivative(delta=1, pool=pool)
             dnorm = sum([i ** 2 for i in d.values()])
             if d_step_flag == 'FW':
                 # make a step on a capacity direction
@@ -523,7 +523,7 @@ class TrafficAssignment(object):
             return {}, (0, 0)
         '''
 
-    def bisection_capacity(self, m_derivative, bisection_n=10, method_='bisection'):
+    def bisection_capacity(self, m_derivative, bisection_n=7, method_='bisection'):
         if method_ == 'bisection':
             l = 1 / 2
             ub = 1
@@ -553,14 +553,14 @@ class TrafficAssignment(object):
             return l
 
     def update_capacity(self, d, d_step=9e-2, t=1):
-        #d_step = 9e-2
-        d_step = self.bisection_capacity(d)
-        #d_step = d_step/t
-        gamma0 = {(i, j): d_step for i, j in self.graph.edges()}
-        gamma = gamma0
+        d_step = 30
+        #d_step = self.bisection_capacity(d)
+        d_step = d_step/t
+        #gamma0 = {(i, j): d_step for i, j in self.graph.edges()}
+        #gamma = gamma0
         V = []
         for (i, j), g in d.items():
-            v = gamma[(i, j)] * g
+            v = d_step* g
             m = 1500
             if (i,j) not in V:
                 max_c = self.graph[i][j]['max_capacity']

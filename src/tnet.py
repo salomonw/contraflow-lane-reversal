@@ -1,3 +1,5 @@
+import random
+
 import networkx as nx
 import pandas as pd
 from gurobipy import *
@@ -643,13 +645,11 @@ def readNetFile(netFile, sep="\t"):
     for line in file_flow_lines:
         if ";" in line and "~" not in line:
             links = line.split(sep)
-     #       if 'Subway' in netFile:
-     #           print(links[1]+'->'+links[2])
             G.add_edge(int(links[1]), int(links[2]), capacity=float(links[3]), \
                        length=float(links[4]), t_0=float(links[5]), \
                        B=float(links[6]), power=float(links[7]), speedLimit=float(links[8]), \
                        toll=float(links[9]), type=float(links[10]))
-    #G = nx.convert_node_labels_to_integers(G, first_label=1, ordering='sorted', label_attribute='node name')
+    G = nx.convert_node_labels_to_integers(G, first_label=1, ordering='sorted', label_attribute='node name')
     #print(list(G.nodes()))
     for n in G.nodes():
         G.nodes[n]['node name'] = n
@@ -890,8 +890,11 @@ def get_totalTravelTime(G, fcoeffs, G_exogenous=False):
     a float 
 
     """
-    return sum([G[i][j]['flow'] * G[i][j]['t_0'] * travel_time(G, fcoeffs, i, j, G_exogenous=G_exogenous) for i, j in
-                G.edges()])
+    obj = 0
+    for i, j in G.edges():
+        G[i][j]['t_k'] = G[i][j]['t_0'] * travel_time(G, fcoeffs, i, j, G_exogenous=G_exogenous)
+        obj += G[i][j]['flow'] * G[i][j]['t_k']
+    return obj
 
 
 

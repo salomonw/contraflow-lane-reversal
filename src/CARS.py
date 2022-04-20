@@ -43,21 +43,24 @@ def get_approx_fun(fcoeffs, range_=[0,2], nlines=3, plot=2, ax=None):
     theta.insert(0,0)
     theta.append(range_[1])
     if plot == 1 :
-        if nlines ==2 :
-            ax.plot(x, y , label = '$t(x)$')#, color='k')
-        ypws = [eval_pw(a,b, theta[0:-1], i) for i in x]
-        p = ax.plot(x, ypws, '-', label='$\hat{t}(x)$, $n=$'+str(nlines))
+        #if nlines ==2 :
+        #ax.plot(x, y , label = '$t(x)$', color='k')
+        ypws = [eval_pw(a, b, theta[0:-1], i) for i in x]
+        p = ax.plot(x, ypws, '-', label='$\hat{t}(x/m)$, $n=$'+str(nlines), alpha=0.9)
+        ax.plot(x, y,  '-', label='$t(x/m)$', color='k',  alpha=0.9)
         color = p[0].get_color()
         j=0
         for th in theta:
             if th > range_[0] and th< range_[1]:
                 j+=1
-                ax.text(th+0.02, 2.8 ,'$\\theta^{('+str(j)+')}$' ,color=color)
+                ax.text(th+0.02, 2.35 ,'$\\theta^{('+str(j)+')}$', color=color)
                 ax.axvline(x=th, linestyle=':', color=color)
-        ax.set_xlabel('x')
-        ax.set_ylabel('t(x)')
+                ax.scatter(x=th, y=eval_pw(a, b, theta, th), marker='.', color=color)
+        ax.axvline(x=1, linestyle='--', color='red')
+        ax.text(1 + 0.02, 2.35, '$\\Theta$', color='red')
+        ax.set_xlabel('$x/m$')
+        ax.set_ylabel('Travel time')
         ax.set_xlim((range_[0],range_[1]))
-        plt.legend()
         plt.tight_layout()
     if plot == 2:
         fig, ax = plt.subplots(2)
@@ -142,7 +145,7 @@ def add_capacity_cnstr(m, tnet, xu, c, s, r, q, max_reversals):
     sum = 0
     for i,j in tnet.G_supergraph.edges():
         m.addConstr(s[(i,j)] >= xu[(i,j)] - c[(i,j)]*1500)
-        m.addConstr(c[(i, j)] + c[(j, i)] <= tnet.G_supergraph[i][j]['lanes']+tnet.G_supergraph[j][i]['lanes'])
+        m.addConstr(c[(i, j)] + c[(j, i)] == tnet.G_supergraph[i][j]['lanes']+tnet.G_supergraph[j][i]['lanes'])
         m.addConstr(r[(i, j)] >= (tnet.G_supergraph[i][j]['lanes']- c[(i, j)]))
         m.addConstr(r[(i, j)] >= -(tnet.G_supergraph[i][j]['lanes'] - c[(i, j)]))
         #print(tnet.G_supergraph[i][j]['lanes'])

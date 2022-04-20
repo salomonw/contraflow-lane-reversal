@@ -308,7 +308,7 @@ def solve_FW(tNet_, step, n_iter):
     #ax[1].plot(list(range(len(TT))), d_norm, label='step=' + str(step), alpha=0.7)
     #ax[2].plot(list(range(len(RG))), RG, label='step=' + str(step), alpha=0.7)
 
-    tNet1 = project_fluid_sol_to_integer(tNet1)
+    #tNet1 = project_fluid_sol_to_integer(tNet1)
 
     #tNet1, runtime, od_flows, _ = cars.solve_bush_CARSn(tNet1,
     #                                                 fcoeffs=tNet1.fcoeffs,
@@ -345,7 +345,8 @@ def solve_alternating(tNet0, e=1e-2, theta=None, a=None, type_='full', n_lines_C
 
     t0 = time.time()
     tNet, runtime, od_flows, c = cars.solve_bush_CARSn(tNet, fcoeffs=tNet.fcoeffs, n=n_lines_CARS, exogenous_G=False,
-                                                    rebalancing=False, linear=False, bush=True, theta=theta, a=a)
+                                                    rebalancing=False, linear=False, bush=True, theta=theta, a=a,
+                                                       capacity=False)
     obj = tnet.get_totalTravelTime(tNet.G_supergraph, tNet.fcoeffs)
     objs.append(obj)
     while eps>e and k<7:
@@ -358,16 +359,17 @@ def solve_alternating(tNet0, e=1e-2, theta=None, a=None, type_='full', n_lines_C
         if type_== 'one by one':
             sol = solve_opt_int_pwl(tNet, betas=betas, breaks=breaks, max_lanes=1)
         elif type_== 'full':
-            sol = solve_opt_int_pwl(tNet, betas=betas, breaks=breaks, max_lanes=len(tNet.G_supergraph.edges()))
+            sol = solve_opt_int_pwl(tNet, betas=betas, breaks=breaks, max_lanes=len(tNet.G_supergraph.edges())*10)
         else:
             sol = solve_opt_int_pwl(tNet, betas=betas, breaks=breaks, max_lanes=type_)
         for i, j in tNet.G.edges():
             tNet.G_supergraph[i][j]['capacity'] = sol[(i, j)] * 1500
             tNet.G_supergraph[i][j]['t_k'] = cars.travel_time(tNet, i, j)
-        obj = tnet.get_totalTravelTime(tNet.G_supergraph, tNet.fcoeffs)
         k+=1
         tNet, runtime, od_flows, c = cars.solve_bush_CARSn(tNet, fcoeffs=tNet.fcoeffs, n=n_lines_CARS, exogenous_G=False,
-                                                        rebalancing=False, linear=False, bush=True, theta=theta, a=a)
+                                                        rebalancing=False, linear=False, bush=True, theta=theta, a=a,
+                                                        capacity=False)
+        obj = tnet.get_totalTravelTime(tNet.G_supergraph, tNet.fcoeffs)
         objs.append(obj)
     rtime = time.time() - t0
     return tNet, objs, rtime
@@ -398,7 +400,7 @@ def integralize_inputs(tNet):
     nx.set_edge_attributes(tNet.G_supergraph, 0, 'max_lanes')
     nx.set_edge_attributes(tNet.G_supergraph, 0, 'max_capacity')
     for i, j in tNet.G_supergraph.edges():
-        tNet.G_supergraph[i][j]['lanes'] = max(round(tNet.G_supergraph[i][j]['capacity'] / 1500), 1)
+        tNet.G_supergraph[i][j]['lanes'] = max(1, round(tNet.G_supergraph[i][j]['capacity'] / 1500))
         if tNet.G_supergraph[j][i] == False:
             print('a')
     for i, j in tNet.G_supergraph.edges():

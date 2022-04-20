@@ -37,8 +37,8 @@ class pwapprox:
         return self.y_hat, self.g_hat
 
     def random_initial_partition(self):
-        random.seed(6)#6
-        np.random.seed(6)#6
+        random.seed(8)#6
+        np.random.seed(8)#6
         non_empty = True
         while non_empty == True:
             non_empty = True
