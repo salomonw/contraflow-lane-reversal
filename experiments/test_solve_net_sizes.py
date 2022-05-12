@@ -62,9 +62,9 @@ def solve_and_get_stats(tNet, theta, a):
 
 
     results = []
-    models = ['MIQP', 'QP', 'MILP', 'LP']
+    models = ['LP', 'QP', 'MILP', 'MIQP']
     i = 0
-    for model in [MIQP, QP, MILP, LP]:
+    for model in [LP, QP, MILP, MIQP]:
         nLanes = sum([v for k, v in c.items()])/1500
         results.append([net_name, models[i], model.Runtime*1000, model.ObjVal, nLanes, params['n'], model.NumIntVars, model.NumVars - model.NumIntVars, model.NumConstrs])
         i+=1
@@ -72,24 +72,85 @@ def solve_and_get_stats(tNet, theta, a):
 
 if __name__ == "__main__":
     nets = ['test_9', 'EMA', 'SiouxFalls', 'EMA_mid', 'Anaheim', 'NYC']
-    nets = ['test_9', 'EMA', 'SiouxFalls', 'EMA_mid', 'Anaheim']
     cols = ['Network', 'Model', 'Time', 'Objective', 'Num. Lanes', 'L', 'Integer Vars.', 'Continuous Vars.', 'Num. Constraints']
     df = pd.DataFrame()
-    for net_name in nets:
-        # Read net
-        tNet, fcoeffs = read_net(net_name)
-        # Create supergraph
-        tNet.build_supergraph(identical_G=True)
-        # Multiply demand
-        g_mult = 2
-        g_per = tnet.perturbDemandConstant(tNet.g, g_mult)
-        tNet.set_g(g_per)
-        # Preprocessing
-        tNet, max_caps = cflow.integralize_inputs(tNet)
 
-        for l in [3, 5, 7]:
-            # find different granularities
-            theta, a = get_pwfunction(fcoeffs, n=l, theta_n=3, theta=False, userCentric=False)
-            result = solve_and_get_stats(tNet, theta, a)
-            df = df.append(pd.DataFrame(result, columns=cols), ignore_index=True)
-    df.to_csv('different_net_sizes_exp.csv')
+    for model in ['LP', 'QP', 'MILP', 'MIQP']:
+
+        for net_name in nets:
+            # Read net
+            tNet, fcoeffs = read_net(net_name)
+            # Create supergraph
+            tNet.build_supergraph(identical_G=True)
+            # Multiply demand
+            g_mult = 2
+            g_per = tnet.perturbDemandConstant(tNet.g, g_mult)
+            tNet.set_g(g_per)
+            # Preprocessing
+            tNet, max_caps = cflow.integralize_inputs(tNet)
+
+            for l in [3, 5, 7]:
+                # find different granularities
+                theta, a = get_pwfunction(fcoeffs, n=l, theta_n=3, theta=False, userCentric=False)
+
+                params = {
+                    'fcoeffs': tNet.fcoeffs,
+                    'n': len(a),
+                    'theta': theta,
+                    'a': a,
+                    'exogenous_G': False,
+                    'rebalancing': False,
+                    'linear': False,
+                    'bush': True,
+                    'capacity': True,
+                    'integer': True,
+                    'lambda_cap': 1,
+                    'od_flows_flag': False,
+                    'userCentric': False,
+                    'max_reversals': 50000
+                }
+
+                if model == 'MIQP':
+                    params['integer'] = True
+                    params['linear'] = False
+                    _, m, c = cars.solve_bush_CARSn(tNet, **params)
+                elif model == 'QP':
+                    params['integer'] = False
+                    params['linear'] = False
+                    _, m, c = cars.solve_bush_CARSn(tNet, **params)
+                elif model == 'MILP':
+                    params['integer'] = True
+                    params['linear'] = True
+                    _, m, c = cars.solve_bush_CARSn(tNet, **params)
+                elif model == 'LP':
+                    params['linear'] = True
+                    params['integer'] = False
+                    _, m, c = cars.solve_bush_CARSn(tNet, **params)
+
+                nLanes = sum([v for k, v in c.items()]) / 1500
+
+                result = [[net_name, model, m.Runtime * 1000, m.ObjVal, nLanes, params['n'], m.NumIntVars,
+                     m.NumVars - m.NumIntVars, m.NumConstrs]]
+
+                #result = solve_and_get_stats(tNet, theta, a)
+                df = df.append(pd.DataFrame(result, columns=cols), ignore_index=True)
+                #Save results
+                print(df)
+                df.to_csv('different_net_sizes_exp.csv')
+
+    # Generate plot
+    groups = df.groupby('Model')
+    # Plot
+    fig, ax = plt.subplots(figsize=(4, 3))
+    #ax.margins(0.05)  # Optional, just adds 5% padding to the autoscaling
+    for name, group in groups:
+        ax.scatter(group['Num. Lanes'], group['Time'], marker='o', label=name)
+    ax.set_xlabel('Num. Lanes in Network')
+    ax.set_ylabel('Computational Time (ms)')
+    ax.set_yscale('log')
+    ax.set_xscale('log')
+    ax.grid()
+    ax.legend(frameon=1, facecolor='white', framealpha=0.75, loc=2)
+    plt.tight_layout()
+    plt.savefig('problem_size.pdf')
+
